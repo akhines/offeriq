@@ -9,6 +9,7 @@ import { FeeSlider } from "@/components/fee-slider";
 import { AINegotiationPanel } from "@/components/ai-negotiation-panel";
 import { ExportActions } from "@/components/export-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CompsPanel } from "@/components/comps-panel";
 import { calculateDerivedOutputs } from "@/lib/underwriting";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -261,6 +262,11 @@ export default function Home() {
 
           <div className="lg:col-span-2">
             <div className="lg:sticky lg:top-24 space-y-6">
+              <CompsPanel
+                address={typeof answers.propertyAddress === "string" ? answers.propertyAddress : ""}
+                onSuggestedARV={(arv) => updateAnswer("arv", arv)}
+              />
+
               <OutputsPanel
                 derived={derived}
                 answers={answers}
