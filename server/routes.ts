@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, questionsConfig, type NegotiationPlan } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, type NegotiationPlan, type CompsData, type ComparableSale } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 
 export async function registerRoutes(
@@ -191,6 +191,105 @@ IMPORTANT:
       console.error("Negotiation AI error:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to generate negotiation plan" 
+      });
+    }
+  });
+
+  app.post("/api/comps", async (req, res) => {
+    try {
+      const parseResult = compsRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromError(parseResult.error);
+        return res.status(400).json({ error: validationError.toString() });
+      }
+
+      const { address } = parseResult.data;
+      const apiKey = process.env.RENTCAST_API_KEY;
+
+      if (!apiKey) {
+        return res.status(503).json({ 
+          error: "Comparable sales API not configured. Please add a RentCast API key.",
+          needsApiKey: true
+        });
+      }
+
+      const encodedAddress = encodeURIComponent(address);
+      const compsUrl = `https://api.rentcast.io/v1/sales/comparables?address=${encodedAddress}&limit=10&radius=1&daysOld=180`;
+      
+      const response = await fetch(compsUrl, {
+        headers: {
+          "X-Api-Key": apiKey,
+          "Accept": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("RentCast API error:", response.status, errorText);
+        
+        if (response.status === 401) {
+          return res.status(401).json({ error: "Invalid API key" });
+        }
+        if (response.status === 404) {
+          return res.status(404).json({ error: "No comparable sales found for this address" });
+        }
+        return res.status(response.status).json({ error: "Failed to fetch comparable sales" });
+      }
+
+      const data = await response.json();
+      
+      const comps: ComparableSale[] = (data.comparables || []).map((comp: any) => ({
+        address: comp.formattedAddress || comp.address || "Unknown",
+        price: comp.price || comp.lastSalePrice || 0,
+        sqft: comp.squareFootage || 0,
+        pricePerSqft: comp.squareFootage ? Math.round((comp.price || comp.lastSalePrice || 0) / comp.squareFootage) : 0,
+        bedrooms: comp.bedrooms || 0,
+        bathrooms: comp.bathrooms || 0,
+        yearBuilt: comp.yearBuilt || 0,
+        soldDate: comp.lastSaleDate || comp.saleDate || "Unknown",
+        distanceMiles: comp.distance || 0,
+        daysOnMarket: comp.daysOnMarket,
+        propertyType: comp.propertyType
+      }));
+
+      const validComps = comps.filter(c => c.price > 0 && c.sqft > 0);
+      const prices = validComps.map(c => c.price);
+      const pricesPerSqft = validComps.map(c => c.pricePerSqft);
+      
+      const avgPricePerSqft = pricesPerSqft.length > 0 
+        ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length) 
+        : 0;
+      
+      const sortedPrices = [...prices].sort((a, b) => a - b);
+      const medianPrice = sortedPrices.length > 0
+        ? sortedPrices[Math.floor(sortedPrices.length / 2)]
+        : 0;
+      
+      const suggestedARV = validComps.length >= 3
+        ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+        : medianPrice;
+
+      const compsData: CompsData = {
+        comps: validComps,
+        subjectProperty: data.property ? {
+          address: data.property.formattedAddress || address,
+          estimatedValue: data.property.estimatedValue,
+          sqft: data.property.squareFootage,
+          bedrooms: data.property.bedrooms,
+          bathrooms: data.property.bathrooms,
+          yearBuilt: data.property.yearBuilt,
+          lotSize: data.property.lotSize
+        } : undefined,
+        avgPricePerSqft,
+        medianPrice,
+        suggestedARV
+      };
+
+      res.json(compsData);
+    } catch (error) {
+      console.error("Comps API error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to fetch comparable sales" 
       });
     }
   });

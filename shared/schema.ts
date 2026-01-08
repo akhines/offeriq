@@ -35,6 +35,15 @@ export interface QuestionConfig {
 
 export const questionsConfig: QuestionConfig[] = [
   {
+    id: "propertyAddress",
+    label: "Property Address",
+    type: "text",
+    placeholder: "123 Main St, City, State ZIP",
+    helpText: "Enter the full property address to pull comparable sales",
+    required: true,
+    category: "interview",
+  },
+  {
     id: "timeline",
     label: "How soon do you want to sell?",
     type: "select",
@@ -259,6 +268,42 @@ export const questionsConfig: QuestionConfig[] = [
 ];
 
 export type Answers = Record<string, string | number | boolean | undefined>;
+
+export interface ComparableSale {
+  address: string;
+  price: number;
+  sqft: number;
+  pricePerSqft: number;
+  bedrooms: number;
+  bathrooms: number;
+  yearBuilt: number;
+  soldDate: string;
+  distanceMiles: number;
+  daysOnMarket?: number;
+  propertyType?: string;
+}
+
+export interface CompsData {
+  comps: ComparableSale[];
+  subjectProperty?: {
+    address: string;
+    estimatedValue?: number;
+    sqft?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    yearBuilt?: number;
+    lotSize?: number;
+  };
+  avgPricePerSqft: number;
+  medianPrice: number;
+  suggestedARV: number;
+}
+
+export const compsRequestSchema = z.object({
+  address: z.string().min(5, "Please enter a valid address"),
+});
+
+export type CompsRequest = z.infer<typeof compsRequestSchema>;
 
 export interface DerivedOutputs {
   rehabPerSqft: number;
