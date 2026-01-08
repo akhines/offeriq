@@ -1,0 +1,173 @@
+You are a senior full-stack engineer building a production-ready web app for real estate deal underwriting.
+
+GOAL
+Build a web app that:
+1) captures answers to a standardized seller interview (about 20 questions),
+2) shows per-question outputs (calculations + optional AI analysis) inside each question card,
+3) produces final outputs:
+   - AI-driven negotiation & influence recommendations based on Tony Robbins 6 Human Needs + DISC-style communication cues (treated as hypotheses, not diagnoses),
+   - offer price recommendation with a sliding scale based on assignment fee size,
+   - a clean deal summary that can be copied/exported.
+
+IMPORTANT CONSTRAINTS
+- Use Next.js (App Router) + TypeScript.
+- Use Tailwind for styling.
+- Keep API keys server-side only (never in client).
+- Use a “Question Module” architecture so each question can have its own:
+  - input type,
+  - validation,
+  - derived calculations,
+  - optional AI action button and AI output region.
+- Minimal dependencies; do not over-engineer.
+- Provide clear instructions to run locally.
+- Provide sensible defaults, but allow user overrides.
+- Avoid manipulative “dark pattern” tactics: negotiation guidance must be ethical, transparent, and framed as rapport/clarity.
+
+FEATURES (MUST HAVE)
+A) UI Layout
+- Left column: “Seller Interview” dynamic list of question cards.
+- Right column: “Underwriting Outputs” panel + “Assignment Fee Slider” panel + “AI Negotiation Plan” panel.
+- Responsive: stacks on mobile.
+
+B) Question Cards (Dynamic)
+Build questions from a single config array (JSON-like) with:
+- id, label, type (text/textarea/number/boolean/scale/select),
+- placeholders/help text,
+- visibility rules (e.g., show HVAC age only if HVAC = yes),
+- parse/validation (numbers, ranges),
+- derived fields per question (if relevant),
+- aiModule (optional) = { endpoint, buttonLabel, promptTemplate, inputKeys }.
+
+Questions to include (start with these; make it easy to add more):
+1. How soon do you want to sell?
+2. Why do you want to sell?
+3. Condition score 0–10
+4. What improvements to make it a 10?
+5. Outside improvements last 3 years (roof/windows/siding)?
+6. Inside improvements last 3 years (kitchen/baths/flooring)?
+7. Is there central HVAC? (boolean)
+8. If yes, HVAC age (years)
+9. Any failed systems currently (HVAC/plumbing/electrical/roof/waterproofing/basement)?
+10. How much do you owe? ($)
+11. What’s your PITI payment? ($/mo)
+12. What’s your interest rate? (%)
+13. How much profit do you need to realize upon sale? ($)
+14. How much do you think it can sell for as a 10/10? ($)
+
+Add underwriting essentials (for calculations):
+15. Property square footage (sqft)
+16. Your ARV from comps ($)
+17. Estimated closing/transaction costs ($)
+18. Holding buffer (% or $) default 1% ARV
+19. Target investor rule % (default 70% ARV)
+20. Rehab override ($) optional; otherwise estimate from condition score and sqft
+
+C) Underwriting Engine (Client-side)
+Compute in real-time:
+- rehabPerSqft estimate based on condition score (editable mapping in code),
+- rehab estimate = sqft * rehabPerSqft (unless rehab override provided),
+- investorBuyPrice = ARV * (rule%) - rehab - closingCosts - holdingBuffer,
+- sellerOffer = investorBuyPrice - assignmentFee,
+- equityAtOffer = sellerOffer - owed,
+- simple risk flags: HVAC risk (if age >= 15), failed systems presence, expectation gap (seller ARV vs your ARV).
+
+D) Assignment Fee Slider
+- Slider range: $5,000 to $50,000 step $1,000.
+- Changing slider updates sellerOffer immediately.
+- Display investorBuyPrice, sellerOffer, and delta.
+
+E) AI Endpoints (Server-side)
+Create API routes:
+1) POST /api/ai/question
+- Input: { questionId, answers, derived }
+- Output: short AI analysis for that specific question card
+Examples:
+- motivation analysis for “Why selling”
+- rehab scope checklist for “Improvements needed”
+- objection handling suggestions if “needed profit” is high
+
+2) POST /api/ai/negotiation
+- Input: { answers, derived, assignmentFee }
+- Output: a structured negotiation plan:
+  - Seller summary
+  - Motivation hypotheses + confidence
+  - DISC-style communication cues (hypotheses)
+  - Tony Robbins 6 Needs mapping (hypotheses)
+  - 8–12 follow-up questions
+  - Offer framing script (soft and direct)
+  - Objection handling bullets (price/timeline/trust)
+  - Next best action steps for the acquisitions rep
+
+Implement AI calls using a provider abstraction:
+- Create a single file lib/llm.ts with a function callLLM(prompt): Promise<string>
+- Use environment variable for API key (e.g., OPENAI_API_KEY).
+- If no key is provided, return a helpful stub response so the app still works.
+
+F) Safety + Tone Guardrails (MUST)
+- Include a system-like instruction inside prompts:
+  “Provide ethical, non-manipulative negotiation guidance. Treat profiling as hypothesis. Ask confirming questions. Avoid coercion, deception, or pressure tactics.”
+
+G) Deal Save / Export
+- Provide a “Copy Deal Summary” button that copies:
+  - key answers,
+  - computed outputs,
+  - AI negotiation plan.
+- Also provide “Export JSON” button (download deal.json).
+
+NICE TO HAVE (IF TIME)
+- LocalStorage autosave.
+- “Reset deal” button.
+- Inline validation messages.
+
+DELIVERABLES
+- A complete Next.js project with:
+  - app/page.tsx
+  - app/api/ai/question/route.ts
+  - app/api/ai/negotiation/route.ts
+  - lib/llm.ts
+  - types (Question, Answers, Derived)
+  - minimal styling via Tailwind
+- Clear run instructions:
+  - npm install
+  - npm run dev
+  - set OPENAI_API_KEY in Replit Secrets / .env
+
+IMPLEMENTATION DETAILS
+- Use React state for answers: Record<string, any>.
+- Use useMemo to compute derived underwriting outputs.
+- Use conditional rendering for dependent questions (HVAC age).
+- Each question card includes:
+  - label
+  - input
+  - small “Computed” line if relevant
+  - “Run AI” button if aiModule exists
+  - collapsible AI output box with loading/error states
+
+QUALITY BAR
+- Clean componentization:
+  - <QuestionCard />
+  - <OutputsPanel />
+  - <FeeSlider />
+  - <AiPlanPanel />
+- No duplicated logic; computations centralized.
+- Type-safe and readable.
+- Works end-to-end even without an AI key (stub).
+
+Now generate the full code for this project, with all files and content, ready to paste into Replit.
+If you want, I can also tailor the prompt to Replit’s specific stack template (Next.js vs Vite vs Remix) and include a “choose template” line—but the prompt above usually forces Replit to pick the right one automatically.
+
+
+
+
+
+
+
+
+
+
+
+Thinking
+
+
+
+ChatGPT can make mistakes. OpenAI doesn't use Impact Home Team Workspace workspace data to train its models.
