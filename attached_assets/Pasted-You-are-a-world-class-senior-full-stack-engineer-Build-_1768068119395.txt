@@ -1,0 +1,275 @@
+You are a world-class senior full-stack engineer. Build a production-ready underwriting web app in Replit.
+
+PRODUCT NAME
+Deal Desk — 3-Engine Real Estate Underwriter
+
+CORE CONCEPT
+The app is built around 3 “engines” that pass structured outputs to each other:
+
+1) UNDERWRITING ENGINE
+Inputs: all known info about the property + seller (manual user inputs AND enriched/public info AND AVM baselines if available).
+Output: “As-is / where-is / today” value RANGE (low/base/high), confidence score, and key value drivers.
+
+2) OFFER CALCULATION ENGINE
+Inputs: underwriting output + user settings (profit targets, strategy, fees, risk buffers, market tuning).
+Output: recommended offer ladder (3-tier) + assignment fee slider impact + sensitivity summary.
+
+3) OFFER PRESENTATION ENGINE
+Inputs: all notes, call summaries/transcripts (manual for MVP) + offer ladder + seller constraints.
+Output: a structured, ethical offer presentation plan optimized for win rate (talk track, offer packaging, follow-ups).
+Later becomes a premium feature by connecting to GoHighLevel (GHL) via API, but MVP uses manual paste-in notes/transcripts.
+
+TECH STACK (MUST)
+- Next.js (App Router) + TypeScript
+- Tailwind CSS
+- Minimal dependencies
+- No secrets on the client (all keys server-side)
+- Project must run end-to-end on Replit
+
+UX REQUIREMENTS (MUST)
+Single page app layout with 3 main tabs or 3 stacked sections (your choice, but clean):
+A) Underwriting
+B) Offer Calculation
+C) Offer Presentation
+
+Each section has:
+- Inputs panel (left) and Outputs panel (right), responsive for mobile.
+
+DATA MODEL (MUST)
+Create strict types:
+
+PropertyInfo:
+- address (required)
+- city/state/zip
+- propertyType
+- beds, baths, sqft, lotSize, yearBuilt (optional but supported)
+- occupancy (vacant/tenant/owner/unknown)
+- conditionScore (0–10)
+- improvementsNeeded (text)
+- knownIssues (multi-line text or checklist)
+- hvacCentral (bool), hvacAgeYears (number optional)
+- roofAgeYears (optional)
+- notes (general)
+
+SellerInfo:
+- timelineToSell (text or select)
+- reasonForSelling (text)
+- owed (number)
+- pitiMonthly (number)
+- interestRatePct (number)
+- neededProfit (number)
+- sellerThinksAs10Value (number)
+- decisionMakers (text)
+- objectionsHeard (text)
+
+PublicInfo (enriched placeholder for MVP):
+- lastSaleDate, lastSalePrice (optional)
+- taxAssessedValue (optional)
+- neighborhoodName (optional)
+
+AVMBaselines:
+- zillowZestimate (number optional)
+- redfinEstimate (number optional)
+- otherAVMName + otherAVMValue (optional list)
+
+UnderwritingOutput:
+- asIsLow, asIsBase, asIsHigh (numbers)
+- repairLow, repairHigh (numbers)
+- confidenceScore (0–100)
+- drivers: string[]
+- missingData: string[]
+- avmBlendUsed: {source, value, weight}[]
+
+OfferSettings:
+- strategy: "wholesale" | "flip" | "rental"
+- targetRulePct (default 70% for wholesale baseline)
+- closingCosts (number default)
+- holdingBuffer (either pct of value OR dollar)
+- riskBuffer (slider dollars)
+- assignmentFee (slider dollars)
+- desiredProfit (number)
+- marketCoolingFactorPct (0–10% slider)
+- liquidityScore (optional manual)
+
+OfferOutput:
+- investorBuyPrice (number)
+- sellerOffer (number)
+- offerLadder: [{name, price, useWhen}]
+- sensitivity: string[] (e.g., “+10k repairs = -10k offer”)
+- dealGrade: "A"|"B"|"C"|"D" (simple rule-based)
+
+PresentationInput:
+- callNotes (multi-entry list with date + text) OR freeform transcript paste box
+- keySellerConstraints (auto from SellerInfo)
+- preferredCommunication (call/text/email)
+- tonePreference (professional/casual)
+- any prior offers made (text)
+
+PresentationOutput:
+- sellerSummary (short)
+- motivationHypotheses (bullets w/ confidence labels)
+- communicationCues (DISC-style hypotheses; not a diagnosis)
+- sixNeedsMapping (hypotheses; not a diagnosis)
+- recommendedOfferTier (which ladder item to present first)
+- offerPackagingPlan (one offer vs two options vs three options)
+- talkTrackSoft (script)
+- talkTrackDirect (script)
+- objectionHandling (bullets)
+- nextActions (checklist)
+- followUpCadence (simple)
+
+ENGINE LOGIC (MUST)
+
+1) UNDERWRITING ENGINE
+- Compute AVM base blend:
+  - Use whichever AVMs are present (Zillow, Redfin, other).
+  - Default weights if present (configurable in code):
+    - Zillow 0.45, Redfin 0.35, Other 0.20 (normalize based on availability).
+  - If no AVMs present, underwriting must still work using comp placeholder or “manual as-is estimate” input.
+- Repairs estimate:
+  - rehabPerSqft mapping based on conditionScore (editable constants):
+    - 9–10: 8
+    - 7–8: 15
+    - 5–6: 28
+    - 3–4: 45
+    - 0–2: 70
+  - repairBase = sqft * rehabPerSqft (if sqft missing, flag missing data and set conservative placeholder)
+  - Add system-failure adders (simple keyword detection from knownIssues text: HVAC, roof, plumbing, electrical, foundation, waterproofing) — each adds a fixed range bump.
+  - Produce repairLow/repairHigh (e.g., base ± 20% plus adders).
+- As-is value range:
+  - Start from AVM_base (or manual baseline if AVMs missing).
+  - Apply condition/repair discount:
+    - asIsBase = AVM_base - repairBase - marketabilityDiscount
+    - marketabilityDiscount can be a small % of AVM_base based on conditionScore and presence of “failed systems”.
+  - asIsLow/asIsHigh as +/- spread based on confidence (low confidence => wider range).
+- Confidence score:
+  - Score increases with availability of: sqft, beds/baths, yearBuilt, at least 1 AVM, repair clarity, and public info.
+  - Output missingData list.
+- Output drivers list (5 max) describing what drove value.
+
+UI for Underwriting:
+- Inputs include:
+  - manual entry for AVMs (Zillow/Redfin) with “source date” optional
+  - property basics
+  - condition + issues
+  - optional public info fields
+- Outputs show:
+  - as-is range + confidence
+  - repairs range
+  - drivers + missingData
+
+IMPORTANT NOTE ABOUT AVMs (MUST)
+- Implement “AVM Providers” as an interface with stubs:
+  - No scraping.
+  - Zillow/Redfin values are manual inputs for MVP.
+  - Provide a future-ready provider interface so later we can plug in licensed APIs.
+- Include a small UI disclaimer: “AVMs are estimates; verify with comps.”
+
+2) OFFER CALCULATION ENGINE
+- Inputs pull from UnderwritingOutput and OfferSettings.
+- Compute investorBuyPrice:
+  - base = asIsBase (NOT ARV) for “as-is today” strategy by default for wholesale.
+  - incorporate marketCoolingFactorPct reducing base value.
+  - investorBuyPrice = (asIsBase * (targetRulePct/100)) - closingCosts - holdingBuffer - riskBuffer
+  - if strategy=flip, add “profit target” logic and show a slightly different equation (keep simple but distinct).
+- Compute sellerOffer:
+  - if strategy=wholesale: sellerOffer = investorBuyPrice - assignmentFee
+  - for flip/rental: sellerOffer = investorBuyPrice (assignment fee hidden)
+- Offer ladder (3 tiers):
+  - “Fast Yes” (highest of the three)
+  - “Fair” (middle)
+  - “Stretch” (lowest)
+  - Ladder should be derived around sellerOffer with +- adjustments and explain “use when…”
+- Sensitivity:
+  - Display 5 bullet sensitivity items:
+    - repairs +10k
+    - assignment fee +5k (wholesale only)
+    - cooling factor +2%
+    - risk buffer +5k
+    - holding buffer +2k
+- Deal Grade:
+  - Simple rule: based on confidence and margin buffers.
+
+UI for Offer Calculation:
+- Sliders:
+  - assignmentFee 5k–50k step 1k
+  - riskBuffer 0–30k step 1k
+  - marketCoolingFactor 0–10%
+- Inputs:
+  - closingCosts, holdingBuffer, desiredProfit, strategy, targetRulePct
+- Outputs:
+  - investorBuyPrice, sellerOffer
+  - offer ladder
+  - sensitivity
+  - deal grade
+
+3) OFFER PRESENTATION ENGINE
+MVP INPUTS:
+- A “Call Notes & Transcript” area where user pastes notes/transcripts (multi-entry list).
+- Pull key seller details automatically from SellerInfo (timeline, reason, neededProfit, objections, decision makers).
+
+OUTPUT:
+- Use a server-side AI endpoint to generate a structured offer presentation plan.
+- Must include strict “Ethical Guardrails” in the prompt:
+  - No deception, coercion, threats, pressure tactics, or manipulation.
+  - Treat DISC / Tony Robbins 6 needs as hypotheses.
+  - Provide confirming questions.
+  - Focus on clarity, rapport, options, and alignment.
+
+UI for Offer Presentation:
+- Button: “Generate Offer Presentation Plan”
+- Show output in sections with copy buttons:
+  - Summary
+  - Hypotheses (motivation + cues)
+  - Offer packaging
+  - Talk tracks (soft + direct)
+  - Objections
+  - Next actions + follow-up cadence
+
+AI IMPLEMENTATION (MUST)
+- Create lib/llm.ts with callLLM({prompt}): Promise<string>
+- Use OPENAI_API_KEY env var (or similar).
+- If key missing, return high-quality stub text so app still works.
+- Create API routes:
+  - POST /api/ai/presentation -> generates PresentationOutput JSON (or well-structured text; JSON preferred)
+  - OPTIONAL: POST /api/ai/underwriting_insights -> converts drivers/missing data into suggestions
+- Use zod (optional) or custom validation to ensure the response is parseable; if not parseable, show raw text.
+
+PERSISTENCE & EXPORT (MUST)
+- Autosave inputs to localStorage
+- Buttons:
+  - “Copy Deal Summary” (includes UnderwritingOutput + OfferOutput + PresentationOutput)
+  - “Export deal.json” download
+
+FUTURE PREMIUM: GHL INTEGRATION (DO NOT IMPLEMENT, BUT PREPARE)
+- Create a file /lib/integrations/ghl.ts with placeholder functions:
+  - fetchRecentCalls()
+  - fetchConversationThreads()
+  - pushNoteToContact()
+- Add a “Premium (Coming Soon)” panel explaining that later it will connect to a GHL workspace via API/webhooks to ingest call transcripts automatically.
+
+PROJECT STRUCTURE (MUST)
+- app/page.tsx
+- components/
+  - UnderwritingSection.tsx
+  - OfferCalcSection.tsx
+  - OfferPresentationSection.tsx
+  - Slider.tsx (small reusable)
+- lib/engines/
+  - underwriting.ts (pure functions)
+  - offerCalc.ts (pure functions)
+  - presentation.ts (types + prompt builder)
+- lib/llm.ts
+- app/api/ai/presentation/route.ts
+- types.ts (central types)
+
+QUALITY BAR
+- Clean, readable, type-safe
+- Pure functions for engine logic
+- No duplicated calculations
+- Good empty states and validation
+- Works without AI key
+
+DELIVERABLE
+Generate the full Next.js project code, with every file fully written and ready to run in Replit.
+Also include a concise README with setup and environment variable instructions.

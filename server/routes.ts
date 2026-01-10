@@ -195,6 +195,111 @@ IMPORTANT:
     }
   });
 
+  app.post("/api/ai/presentation", async (req, res) => {
+    try {
+      const { seller, presentationInput, underwriting, offer } = req.body;
+      
+      if (!underwriting || !offer) {
+        return res.status(400).json({ error: "Underwriting and offer data required" });
+      }
+
+      const constraints: string[] = [];
+      if (seller?.timelineToSell) constraints.push(`Timeline: ${seller.timelineToSell}`);
+      if (seller?.reasonForSelling) constraints.push(`Reason: ${seller.reasonForSelling}`);
+      if (seller?.neededProfit) constraints.push(`Needed profit: $${seller.neededProfit}`);
+      if (seller?.objectionsHeard) constraints.push(`Objections: ${seller.objectionsHeard}`);
+
+      const notesText = (presentationInput?.callNotes || [])
+        .map((n: any) => `[${n.date}] ${n.text}`)
+        .join("\n\n");
+
+      const ladderText = (offer.offerLadder || [])
+        .map((l: any) => `- ${l.name}: $${l.price?.toLocaleString()} (${l.useWhen})`)
+        .join("\n");
+
+      const prompt = `You are an ethical real estate advisor helping prepare an offer presentation plan.
+
+## ETHICAL GUARDRAILS (MANDATORY)
+- NO deception, coercion, threats, pressure tactics, or manipulation
+- Treat all DISC and Tony Robbins 6 Human Needs assessments as HYPOTHESES, not diagnoses
+- Provide confirming questions to validate hypotheses
+- Focus on clarity, rapport, options, and alignment with seller's genuine interests
+
+## UNDERWRITING CONTEXT
+- As-Is Value Range: $${underwriting.asIsLow?.toLocaleString()} - $${underwriting.asIsHigh?.toLocaleString()} (base: $${underwriting.asIsBase?.toLocaleString()})
+- Repairs: $${underwriting.repairLow?.toLocaleString()} - $${underwriting.repairHigh?.toLocaleString()}
+- Confidence: ${underwriting.confidenceScore}%
+
+## OFFER DETAILS
+${ladderText}
+- Deal Grade: ${offer.dealGrade}
+- Margin: $${offer.margin?.toLocaleString()} (${offer.marginPct?.toFixed(1)}%)
+
+## SELLER CONSTRAINTS
+${constraints.length > 0 ? constraints.join("\n") : "None provided"}
+
+## CALL NOTES
+${notesText || presentationInput?.transcriptPaste || "No notes provided"}
+
+## PREFERENCES
+- Communication: ${presentationInput?.preferredCommunication || "Not specified"}
+- Tone: ${presentationInput?.tonePreference || "Professional"}
+
+Generate a JSON response with this structure:
+{
+  "sellerSummary": "2-3 sentence summary",
+  "motivationHypotheses": [{"hypothesis": "...", "confidence": "high|medium|low"}],
+  "communicationCues": ["DISC-style cue 1", "cue 2"],
+  "sixNeedsMapping": [{"need": "Certainty|Variety|Significance|Connection|Growth|Contribution", "hypothesis": "..."}],
+  "recommendedOfferTier": "fast_yes|fair|stretch",
+  "offerPackagingPlan": "How to present the offers",
+  "talkTrackSoft": "Soft approach script",
+  "talkTrackDirect": "Direct approach script",
+  "objectionHandling": ["Objection: Response", ...],
+  "nextActions": ["Action 1", ...],
+  "followUpCadence": "Timing suggestions"
+}`;
+
+      const defaultPlan = {
+        sellerSummary: `Seller is looking to sell with ${seller?.timelineToSell || 'flexible timeline'}. Their situation suggests they may value certainty and a smooth process.`,
+        motivationHypotheses: [
+          { hypothesis: "Financial considerations may be driving the sale", confidence: "medium" },
+          { hypothesis: "Timeline suggests moderate urgency", confidence: "low" },
+        ],
+        communicationCues: [
+          "Hypothesis: Seller may prefer clear, factual communication",
+          "Confirming question: 'What matters most - speed, price, or certainty?'",
+        ],
+        sixNeedsMapping: [
+          { need: "Certainty", hypothesis: "Likely values knowing the deal will close" },
+          { need: "Significance", hypothesis: "May want validation of their property's value" },
+        ],
+        recommendedOfferTier: "fair",
+        offerPackagingPlan: "Present Fair offer as primary with Fast Yes as alternative for speed priority",
+        talkTrackSoft: "I appreciate you discussing your property. Based on our analysis, I'd like to present an offer that works for both of us...",
+        talkTrackDirect: "Based on current market conditions and needed repairs, here's what the numbers show. I can offer $" + (offer.sellerOffer?.toLocaleString() || '0') + " cash with a quick close...",
+        objectionHandling: [
+          "Price concern: 'Let me walk through the repair estimates and market data...'",
+          "Need time: 'Absolutely. This offer is valid for X days. What questions can I answer?'",
+        ],
+        nextActions: [
+          "Confirm offer receipt",
+          "Schedule follow-up within 48 hours",
+          "Prepare documentation if requested",
+        ],
+        followUpCadence: "Day 1: Send offer. Day 2: Courtesy check-in. Day 4: Phone call. Day 7: Follow-up with adjusted terms if needed.",
+      };
+
+      const plan = await callLLMWithJSON(prompt, defaultPlan);
+      res.json({ plan });
+    } catch (error) {
+      console.error("Presentation AI error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to generate presentation plan" 
+      });
+    }
+  });
+
   app.post("/api/comps", async (req, res) => {
     try {
       const parseResult = compsRequestSchema.safeParse(req.body);

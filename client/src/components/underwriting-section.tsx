@@ -1,0 +1,565 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { AlertTriangle, TrendingUp, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput } from "@/types";
+
+interface UnderwritingSectionProps {
+  property: PropertyInfo;
+  seller: SellerInfo;
+  publicInfo: PublicInfo;
+  avmBaselines: AVMBaselines;
+  underwritingOutput: UnderwritingOutput | null;
+  onPropertyChange: (property: PropertyInfo) => void;
+  onSellerChange: (seller: SellerInfo) => void;
+  onPublicInfoChange: (publicInfo: PublicInfo) => void;
+  onAVMChange: (avmBaselines: AVMBaselines) => void;
+  manualAsIsEstimate: number;
+  onManualEstimateChange: (value: number) => void;
+}
+
+function formatCurrency(value: number | undefined): string {
+  if (!value) return "$0";
+  return "$" + value.toLocaleString();
+}
+
+export function UnderwritingSection({
+  property,
+  seller,
+  publicInfo,
+  avmBaselines,
+  underwritingOutput,
+  onPropertyChange,
+  onSellerChange,
+  onPublicInfoChange,
+  onAVMChange,
+  manualAsIsEstimate,
+  onManualEstimateChange,
+}: UnderwritingSectionProps) {
+  const confidenceColor = underwritingOutput
+    ? underwritingOutput.confidenceScore >= 80
+      ? "text-green-600 dark:text-green-400"
+      : underwritingOutput.confidenceScore >= 60
+        ? "text-yellow-600 dark:text-yellow-400"
+        : "text-red-600 dark:text-red-400"
+    : "";
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Property Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="address">Property Address *</Label>
+              <Input
+                id="address"
+                data-testid="input-property-address"
+                value={property.address || ""}
+                onChange={(e) => onPropertyChange({ ...property, address: e.target.value })}
+                placeholder="123 Main St, City, State ZIP"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  data-testid="input-city"
+                  value={property.city || ""}
+                  onChange={(e) => onPropertyChange({ ...property, city: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  data-testid="input-state"
+                  value={property.state || ""}
+                  onChange={(e) => onPropertyChange({ ...property, state: e.target.value })}
+                  maxLength={2}
+                />
+              </div>
+              <div>
+                <Label htmlFor="zip">ZIP</Label>
+                <Input
+                  id="zip"
+                  data-testid="input-zip"
+                  value={property.zip || ""}
+                  onChange={(e) => onPropertyChange({ ...property, zip: e.target.value })}
+                  maxLength={10}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="propertyType">Property Type</Label>
+              <Select
+                value={property.propertyType || ""}
+                onValueChange={(value) => onPropertyChange({ ...property, propertyType: value as PropertyInfo["propertyType"] })}
+              >
+                <SelectTrigger data-testid="select-property-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single_family">Single Family</SelectItem>
+                  <SelectItem value="multi_family">Multi-Family</SelectItem>
+                  <SelectItem value="condo">Condo</SelectItem>
+                  <SelectItem value="townhouse">Townhouse</SelectItem>
+                  <SelectItem value="land">Land</SelectItem>
+                  <SelectItem value="commercial">Commercial</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <Label htmlFor="beds">Beds</Label>
+                <Input
+                  id="beds"
+                  type="number"
+                  data-testid="input-beds"
+                  value={property.beds || ""}
+                  onChange={(e) => onPropertyChange({ ...property, beds: Number(e.target.value) || undefined })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="baths">Baths</Label>
+                <Input
+                  id="baths"
+                  type="number"
+                  step="0.5"
+                  data-testid="input-baths"
+                  value={property.baths || ""}
+                  onChange={(e) => onPropertyChange({ ...property, baths: Number(e.target.value) || undefined })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sqft">Sqft</Label>
+                <Input
+                  id="sqft"
+                  type="number"
+                  data-testid="input-sqft"
+                  value={property.sqft || ""}
+                  onChange={(e) => onPropertyChange({ ...property, sqft: Number(e.target.value) || undefined })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="yearBuilt">Year</Label>
+                <Input
+                  id="yearBuilt"
+                  type="number"
+                  data-testid="input-year-built"
+                  value={property.yearBuilt || ""}
+                  onChange={(e) => onPropertyChange({ ...property, yearBuilt: Number(e.target.value) || undefined })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="occupancy">Occupancy Status</Label>
+              <Select
+                value={property.occupancy || "unknown"}
+                onValueChange={(value) => onPropertyChange({ ...property, occupancy: value as PropertyInfo["occupancy"] })}
+              >
+                <SelectTrigger data-testid="select-occupancy">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vacant">Vacant</SelectItem>
+                  <SelectItem value="owner">Owner Occupied</SelectItem>
+                  <SelectItem value="tenant">Tenant Occupied</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Condition Assessment</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Condition Score: {property.conditionScore ?? 5}/10</Label>
+                <Badge variant={
+                  (property.conditionScore ?? 5) >= 7 ? "default" :
+                  (property.conditionScore ?? 5) >= 4 ? "secondary" : "destructive"
+                }>
+                  {(property.conditionScore ?? 5) >= 7 ? "Good" :
+                   (property.conditionScore ?? 5) >= 4 ? "Fair" : "Poor"}
+                </Badge>
+              </div>
+              <Slider
+                data-testid="slider-condition"
+                value={[property.conditionScore ?? 5]}
+                min={0}
+                max={10}
+                step={1}
+                onValueChange={([value]) => onPropertyChange({ ...property, conditionScore: value })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                0-2: Major rehab | 3-4: Heavy repairs | 5-6: Moderate | 7-8: Light | 9-10: Move-in ready
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="improvements">Improvements Needed</Label>
+              <Textarea
+                id="improvements"
+                data-testid="input-improvements"
+                value={property.improvementsNeeded || ""}
+                onChange={(e) => onPropertyChange({ ...property, improvementsNeeded: e.target.value })}
+                placeholder="Kitchen update, flooring, paint..."
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="issues">Known Issues (affects repair estimate)</Label>
+              <Textarea
+                id="issues"
+                data-testid="input-issues"
+                value={property.knownIssues || ""}
+                onChange={(e) => onPropertyChange({ ...property, knownIssues: e.target.value })}
+                placeholder="HVAC needs replacement, roof leak, foundation crack..."
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Keywords: HVAC, roof, plumbing, electrical, foundation, waterproofing
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="hvac">Has Central HVAC</Label>
+              <Switch
+                id="hvac"
+                data-testid="switch-hvac"
+                checked={property.hvacCentral ?? false}
+                onCheckedChange={(checked) => onPropertyChange({ ...property, hvacCentral: checked })}
+              />
+            </div>
+
+            {property.hvacCentral && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="hvacAge">HVAC Age (years)</Label>
+                  <Input
+                    id="hvacAge"
+                    type="number"
+                    data-testid="input-hvac-age"
+                    value={property.hvacAgeYears || ""}
+                    onChange={(e) => onPropertyChange({ ...property, hvacAgeYears: Number(e.target.value) || undefined })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="roofAge">Roof Age (years)</Label>
+                  <Input
+                    id="roofAge"
+                    type="number"
+                    data-testid="input-roof-age"
+                    value={property.roofAgeYears || ""}
+                    onChange={(e) => onPropertyChange({ ...property, roofAgeYears: Number(e.target.value) || undefined })}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg">AVM Baselines</CardTitle>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">AVMs are automated estimates. Verify with comps before making offers.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="zillow">Zillow Zestimate</Label>
+                <Input
+                  id="zillow"
+                  type="number"
+                  data-testid="input-zillow"
+                  value={avmBaselines.zillowZestimate || ""}
+                  onChange={(e) => onAVMChange({ ...avmBaselines, zillowZestimate: Number(e.target.value) || undefined })}
+                  placeholder="Enter value"
+                />
+              </div>
+              <div>
+                <Label htmlFor="redfin">Redfin Estimate</Label>
+                <Input
+                  id="redfin"
+                  type="number"
+                  data-testid="input-redfin"
+                  value={avmBaselines.redfinEstimate || ""}
+                  onChange={(e) => onAVMChange({ ...avmBaselines, redfinEstimate: Number(e.target.value) || undefined })}
+                  placeholder="Enter value"
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <Label htmlFor="manualEstimate">Manual As-Is Estimate (if no AVMs)</Label>
+              <Input
+                id="manualEstimate"
+                type="number"
+                data-testid="input-manual-estimate"
+                value={manualAsIsEstimate || ""}
+                onChange={(e) => onManualEstimateChange(Number(e.target.value) || 0)}
+                placeholder="Your estimated as-is value"
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              AVMs are estimates only. Always verify with comparable sales analysis.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Seller Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="timeline">Timeline to Sell</Label>
+              <Select
+                value={seller.timelineToSell || ""}
+                onValueChange={(value) => onSellerChange({ ...seller, timelineToSell: value })}
+              >
+                <SelectTrigger data-testid="select-timeline">
+                  <SelectValue placeholder="Select timeline" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ASAP">ASAP (within 2 weeks)</SelectItem>
+                  <SelectItem value="30 days">Within 30 days</SelectItem>
+                  <SelectItem value="60 days">Within 60 days</SelectItem>
+                  <SelectItem value="90+ days">90+ days / Flexible</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="reason">Reason for Selling</Label>
+              <Textarea
+                id="reason"
+                data-testid="input-reason"
+                value={seller.reasonForSelling || ""}
+                onChange={(e) => onSellerChange({ ...seller, reasonForSelling: e.target.value })}
+                placeholder="Relocating, inherited, financial..."
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="owed">Amount Owed</Label>
+                <Input
+                  id="owed"
+                  type="number"
+                  data-testid="input-owed"
+                  value={seller.owed || ""}
+                  onChange={(e) => onSellerChange({ ...seller, owed: Number(e.target.value) || undefined })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="piti">Monthly PITI</Label>
+                <Input
+                  id="piti"
+                  type="number"
+                  data-testid="input-piti"
+                  value={seller.pitiMonthly || ""}
+                  onChange={(e) => onSellerChange({ ...seller, pitiMonthly: Number(e.target.value) || undefined })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="neededProfit">Seller Needs to Walk Away With</Label>
+                <Input
+                  id="neededProfit"
+                  type="number"
+                  data-testid="input-needed-profit"
+                  value={seller.neededProfit || ""}
+                  onChange={(e) => onSellerChange({ ...seller, neededProfit: Number(e.target.value) || undefined })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sellerARV">Seller's Value Estimate</Label>
+                <Input
+                  id="sellerARV"
+                  type="number"
+                  data-testid="input-seller-arv"
+                  value={seller.sellerThinksAs10Value || ""}
+                  onChange={(e) => onSellerChange({ ...seller, sellerThinksAs10Value: Number(e.target.value) || undefined })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-6">
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Underwriting Output</CardTitle>
+              {underwritingOutput && (
+                <Badge className={confidenceColor} variant="outline">
+                  {underwritingOutput.confidenceScore}% Confidence
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {underwritingOutput ? (
+              <>
+                <div>
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    As-Is Value Range
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-xs text-muted-foreground">Low</p>
+                      <p className="font-mono text-lg font-semibold">{formatCurrency(underwritingOutput.asIsLow)}</p>
+                    </div>
+                    <div className="p-3 rounded-md bg-primary/10 border border-primary/20">
+                      <p className="text-xs text-muted-foreground">Base</p>
+                      <p className="font-mono text-lg font-bold text-primary">{formatCurrency(underwritingOutput.asIsBase)}</p>
+                    </div>
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-xs text-muted-foreground">High</p>
+                      <p className="font-mono text-lg font-semibold">{formatCurrency(underwritingOutput.asIsHigh)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Repair Estimate
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-xs text-muted-foreground">Low</p>
+                      <p className="font-mono text-lg font-semibold">{formatCurrency(underwritingOutput.repairLow)}</p>
+                    </div>
+                    <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                      <p className="text-xs text-muted-foreground">Base</p>
+                      <p className="font-mono text-lg font-bold text-destructive">{formatCurrency(underwritingOutput.repairBase)}</p>
+                    </div>
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-xs text-muted-foreground">High</p>
+                      <p className="font-mono text-lg font-semibold">{formatCurrency(underwritingOutput.repairHigh)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {underwritingOutput.marketabilityDiscount > 0 && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Marketability Discount</span>
+                      <span className="font-mono text-destructive">-{formatCurrency(underwritingOutput.marketabilityDiscount)}</span>
+                    </div>
+                  </>
+                )}
+
+                {underwritingOutput.avmBlendUsed.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">AVM Blend Used</h4>
+                      <div className="space-y-1">
+                        {underwritingOutput.avmBlendUsed.map((avm, i) => (
+                          <div key={i} className="flex justify-between text-sm">
+                            <span>{avm.source}</span>
+                            <span className="font-mono">
+                              {formatCurrency(avm.value)} ({(avm.weight * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <Separator />
+
+                <div>
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    Value Drivers
+                  </h4>
+                  <ul className="space-y-1">
+                    {underwritingOutput.drivers.map((driver, i) => (
+                      <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-primary mt-0.5">•</span>
+                        {driver}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {underwritingOutput.missingData.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                        Missing Data
+                      </h4>
+                      <ul className="space-y-1">
+                        {underwritingOutput.missingData.map((item, i) => (
+                          <li key={i} className="text-sm text-yellow-600 dark:text-yellow-400 flex items-start gap-2">
+                            <span>•</span>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <TrendingUp className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>Enter property details to generate underwriting analysis</p>
+                <p className="text-sm mt-1">At minimum, provide an address and either AVM values or a manual estimate</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
