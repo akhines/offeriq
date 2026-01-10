@@ -1,15 +1,15 @@
-# Deal Underwriter - Real Estate Deal Analysis
+# Deal Desk - 3-Engine Real Estate Underwriter
 
 ## Overview
 
-A professional real estate deal underwriting web application that captures seller interview responses, performs automated calculations, and provides AI-powered negotiation recommendations. The app follows a two-column layout with seller interview questions on the left and underwriting outputs on the right.
+A comprehensive real estate deal underwriting application with three main engines for property valuation, offer calculation, and AI-powered negotiation planning. The app provides professional-grade analysis tools for wholesalers, flippers, and rental investors.
 
 **Core Functionality:**
-- Standardized seller interview with ~20 configurable questions
-- Per-question calculations and optional AI analysis
-- Offer price recommendations with adjustable assignment fee slider
-- AI-driven negotiation guidance based on Tony Robbins 6 Human Needs and DISC communication styles
-- Export/copy deal summaries
+- **Underwriting Engine**: AVM blending (Zillow 45%, Redfin 35%, Other 20%), repair estimates, confidence scoring
+- **Offer Calculation Engine**: Investor buy price, seller offer, 3-tier offer ladder (Fast Yes/Fair/Stretch with ±8% adjustments), deal grading (A/B/C/D)
+- **Offer Presentation Engine**: AI-powered negotiation plans using Tony Robbins 6 Human Needs and DISC profiling with ethical guardrails
+- localStorage autosave for all inputs
+- JSON export and copy-to-clipboard functionality
 
 ## User Preferences
 
@@ -20,54 +20,79 @@ Preferred communication style: Simple, everyday language.
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript, using Vite as the build tool
 - **Routing**: Wouter for lightweight client-side routing
-- **State Management**: React Query (@tanstack/react-query) for server state, React useState for local state with localStorage persistence
+- **State Management**: React useState for local state with localStorage persistence
 - **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming (light/dark mode support)
+- **Styling**: Tailwind CSS with CSS variables for theming
 
-**Design Pattern**: Question Module Architecture - each interview question is configured via a JSON-like config array (`questionsConfig` in shared/schema.ts) containing input type, validation rules, visibility conditions, derived calculations, and optional AI modules.
+**Design Pattern**: 3-Engine Architecture with pure functions for calculations
+- `client/src/lib/engines/underwriting.ts` - AVM blending, repair estimates, confidence scoring
+- `client/src/lib/engines/offer-calculation.ts` - Investor buy price, offer ladder, sensitivity analysis, deal grading
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript compiled with tsx for development, esbuild for production
 - **API Structure**: RESTful endpoints under `/api/` prefix
-- **AI Integration**: OpenAI API (via Replit AI Integrations) for question analysis and negotiation plan generation
+- **AI Integration**: OpenAI API (via Replit AI Integrations) for negotiation plan generation
 
 **Key Endpoints:**
-- `POST /api/ai/question` - Generate AI analysis for individual questions
-- `POST /api/ai/negotiation` - Generate comprehensive negotiation plan
+- `POST /api/ai/presentation` - Generate AI-powered negotiation plan with ethical guardrails
 
 ### Data Storage
-- **Database**: PostgreSQL with Drizzle ORM
-- **Schema Location**: `shared/schema.ts` contains both Drizzle table definitions and Zod validation schemas
-- **Current Tables**: users, conversations, messages (chat integration scaffolding)
-- **Client Persistence**: localStorage for interview answers, assignment fee, and AI results
+- **Client Persistence**: localStorage for all deal inputs, settings, and AI results
+- **Database**: PostgreSQL with Drizzle ORM (available for future features)
+- **Schema Location**: `shared/schema.ts` contains Drizzle table definitions and Zod validation schemas
+
+### Key Files
+- `client/src/pages/deal-desk.tsx` - Main page with tabbed 3-engine layout
+- `client/src/types.ts` - Complete type definitions for all engines
+- `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI
+- `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder
+- `client/src/components/offer-presentation-section.tsx` - AI presentation generator
 
 ### Build Configuration
 - Development: `tsx server/index.ts` with Vite middleware for HMR
 - Production: esbuild bundles server code, Vite builds client to `dist/public`
 - Path aliases: `@/` maps to client/src, `@shared/` maps to shared/
 
+## Calculation Logic
+
+### AVM Blending
+- Zillow: 45% weight
+- Redfin: 35% weight
+- Other: 20% weight
+- Values normalized if any input is 0
+
+### Offer Ladder
+- Fast Yes: +8% above Fair price (for quick closes, motivated sellers)
+- Fair: Baseline calculated offer
+- Stretch: -8% below Fair price (for flexible sellers, distressed properties)
+
+### Deal Grading
+- A: High confidence (≥80%), high margin (≥30%), adequate buffers
+- B: Medium confidence (≥60%), decent margin (≥20%)
+- C: Lower confidence or margin
+- D: Risky deal requiring careful consideration
+
+### AI Ethical Guardrails
+- DISC profiles presented as hypotheses, not diagnoses
+- 6 Human Needs assessments include confirming questions
+- No manipulation tactics, focus on win-win negotiations
+
 ## External Dependencies
 
 ### AI Services
-- **OpenAI API**: Used through Replit AI Integrations (environment variables: `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL`)
-- Model: gpt-4o for text analysis, gpt-image-1 for image generation (optional)
+- **OpenAI API**: Used through Replit AI Integrations
+- Model: gpt-4o for negotiation plan generation
 - Fallback: Stub responses when API keys are not configured
-
-### Database
-- **PostgreSQL**: Connection via `DATABASE_URL` environment variable
-- **Drizzle Kit**: Schema migrations via `drizzle-kit push`
-- **connect-pg-simple**: Session storage (scaffolded)
 
 ### Key npm Dependencies
 - `drizzle-orm` / `drizzle-zod`: Database ORM and schema validation
 - `zod`: Runtime type validation
-- `@tanstack/react-query`: Async state management
 - `wouter`: Client routing
 - Radix UI primitives: Accessible component foundations
-- `p-limit` / `p-retry`: Batch processing utilities for LLM calls
+- `framer-motion`: Animations
 
 ### Design System
 - Font families: Inter (UI text), Roboto Mono (numerical data)
-- Material Design-inspired with SaaS refinements per `design_guidelines.md`
+- Professional SaaS styling per `design_guidelines.md`
 - Component styling: shadcn/ui new-york style variant
