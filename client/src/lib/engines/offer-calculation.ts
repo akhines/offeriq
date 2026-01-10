@@ -46,10 +46,10 @@ export function calculateSellerOffer(
 
 export function generateOfferLadder(
   sellerOffer: number,
-  strategy: OfferSettings["strategy"]
+  _strategy: OfferSettings["strategy"]
 ): OfferLadderItem[] {
-  const fastYesAdjustment = strategy === "wholesale" ? 0.08 : 0.05;
-  const stretchAdjustment = strategy === "wholesale" ? 0.08 : 0.05;
+  const fastYesAdjustment = 0.08;
+  const stretchAdjustment = 0.08;
   
   return [
     {
