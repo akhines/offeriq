@@ -61,6 +61,8 @@ export default function DealDesk() {
   });
 
   const [manualAsIsEstimate, setManualAsIsEstimate] = useState(0);
+  const [manualARV, setManualARV] = useState(0);
+  const [manualRepairs, setManualRepairs] = useState(0);
   const [presentationOutput, setPresentationOutput] = useState<PresentationOutput | null>(null);
 
   useEffect(() => {
@@ -110,6 +112,8 @@ export default function DealDesk() {
     if (confirm("Are you sure you want to reset all data? This cannot be undone.")) {
       setState(getDefaultState());
       setManualAsIsEstimate(0);
+      setManualARV(0);
+      setManualRepairs(0);
       setPresentationOutput(null);
       localStorage.removeItem(STORAGE_KEY);
       toast({ description: "All data has been reset" });
@@ -273,6 +277,10 @@ export default function DealDesk() {
               onAVMChange={handleAVMChange}
               manualAsIsEstimate={manualAsIsEstimate}
               onManualEstimateChange={setManualAsIsEstimate}
+              manualARV={manualARV}
+              onManualARVChange={setManualARV}
+              manualRepairs={manualRepairs}
+              onManualRepairsChange={setManualRepairs}
             />
           </TabsContent>
 

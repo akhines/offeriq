@@ -26,6 +26,10 @@ interface UnderwritingSectionProps {
   onAVMChange: (avmBaselines: AVMBaselines) => void;
   manualAsIsEstimate: number;
   onManualEstimateChange: (value: number) => void;
+  manualARV: number;
+  onManualARVChange: (value: number) => void;
+  manualRepairs: number;
+  onManualRepairsChange: (value: number) => void;
 }
 
 function formatCurrency(value: number | undefined): string {
@@ -45,6 +49,10 @@ export function UnderwritingSection({
   onAVMChange,
   manualAsIsEstimate,
   onManualEstimateChange,
+  manualARV,
+  onManualARVChange,
+  manualRepairs,
+  onManualRepairsChange,
 }: UnderwritingSectionProps) {
   const [isLoadingValuation, setIsLoadingValuation] = useState(false);
   const [zillowLink, setZillowLink] = useState<string | null>(null);
@@ -459,6 +467,54 @@ export function UnderwritingSection({
             <p className="text-xs text-muted-foreground">
               AVMs are estimates only. Always verify with comparable sales analysis.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg">Manual Overrides</CardTitle>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">Override calculated values with your own estimates based on comps analysis or contractor quotes.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="manualARV">ARV (After Repair Value)</Label>
+                <Input
+                  id="manualARV"
+                  type="number"
+                  data-testid="input-manual-arv"
+                  value={manualARV || ""}
+                  onChange={(e) => onManualARVChange(Number(e.target.value) || 0)}
+                  placeholder="Your ARV estimate"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  What the property will be worth after repairs
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="manualRepairs">Repairs Estimate</Label>
+                <Input
+                  id="manualRepairs"
+                  type="number"
+                  data-testid="input-manual-repairs"
+                  value={manualRepairs || ""}
+                  onChange={(e) => onManualRepairsChange(Number(e.target.value) || 0)}
+                  placeholder="Total repair cost"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  From contractor quotes or your estimate
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
