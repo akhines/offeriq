@@ -101,7 +101,7 @@ export function UnderwritingSection({
           ...avmBaselines,
           zillowZestimate: data.estimatedValue,
           redfinEstimate: data.priceRangeHigh || undefined,
-          otherAVM: data.priceRangeLow || undefined,
+          otherAVMs: data.priceRangeLow ? [{ name: "RentCast Low", value: data.priceRangeLow }] : avmBaselines.otherAVMs,
         });
       }
 
