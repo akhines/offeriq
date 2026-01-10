@@ -2,14 +2,16 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, TrendingUp, AlertCircle, CheckCircle2, HelpCircle } from "lucide-react";
+import { AlertTriangle, TrendingUp, AlertCircle, CheckCircle2, HelpCircle, Search, Loader2, ExternalLink } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput } from "@/types";
 
 interface UnderwritingSectionProps {
@@ -44,6 +46,96 @@ export function UnderwritingSection({
   manualAsIsEstimate,
   onManualEstimateChange,
 }: UnderwritingSectionProps) {
+  const [isLoadingValuation, setIsLoadingValuation] = useState(false);
+  const [zillowLink, setZillowLink] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchPropertyValuation = async () => {
+    if (!property.address?.trim()) {
+      toast({
+        title: "Address Required",
+        description: "Please enter a property address first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoadingValuation(true);
+    try {
+      const response = await fetch("/api/property/valuation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: property.address }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.needsApiKey) {
+          toast({
+            title: "API Key Required",
+            description: "Please add a RentCast API key to enable property data lookup.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Lookup Failed",
+            description: data.error || "Could not fetch property data.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      onPropertyChange({
+        ...property,
+        sqft: data.sqft || property.sqft,
+        beds: data.bedrooms || property.beds,
+        baths: data.bathrooms || property.baths,
+        yearBuilt: data.yearBuilt || property.yearBuilt,
+        propertyType: mapPropertyType(data.propertyType) || property.propertyType,
+      });
+
+      if (data.estimatedValue) {
+        onAVMChange({
+          ...avmBaselines,
+          zillowZestimate: data.estimatedValue,
+          redfinEstimate: data.priceRangeHigh || undefined,
+          otherAVM: data.priceRangeLow || undefined,
+        });
+      }
+
+      if (data.zillowLink) {
+        setZillowLink(data.zillowLink);
+      }
+
+      toast({
+        title: "Property Data Loaded",
+        description: `Found data for ${data.address || property.address}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch property data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingValuation(false);
+    }
+  };
+
+  const mapPropertyType = (apiType: string | undefined): PropertyInfo["propertyType"] | undefined => {
+    if (!apiType) return undefined;
+    const lower = apiType.toLowerCase();
+    if (lower.includes("single")) return "single_family";
+    if (lower.includes("multi")) return "multi_family";
+    if (lower.includes("condo")) return "condo";
+    if (lower.includes("town")) return "townhouse";
+    if (lower.includes("land")) return "land";
+    if (lower.includes("commercial")) return "commercial";
+    return "other";
+  };
+
   const confidenceColor = underwritingOutput
     ? underwritingOutput.confidenceScore >= 80
       ? "text-green-600 dark:text-green-400"
@@ -62,13 +154,42 @@ export function UnderwritingSection({
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="address">Property Address *</Label>
-              <Input
-                id="address"
-                data-testid="input-property-address"
-                value={property.address || ""}
-                onChange={(e) => onPropertyChange({ ...property, address: e.target.value })}
-                placeholder="123 Main St, City, State ZIP"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="address"
+                  data-testid="input-property-address"
+                  value={property.address || ""}
+                  onChange={(e) => onPropertyChange({ ...property, address: e.target.value })}
+                  placeholder="406 Oakley St, Cambridge, MD 21613"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  data-testid="button-fetch-property"
+                  onClick={fetchPropertyValuation}
+                  disabled={isLoadingValuation || !property.address?.trim()}
+                  size="default"
+                >
+                  {isLoadingValuation ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  <span className="ml-2">{isLoadingValuation ? "Loading..." : "Fetch Data"}</span>
+                </Button>
+              </div>
+              {zillowLink && (
+                <a
+                  href={zillowLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                  data-testid="link-zillow"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  View on Zillow
+                </a>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4">

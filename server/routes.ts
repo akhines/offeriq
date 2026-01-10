@@ -300,6 +300,72 @@ Generate a JSON response with this structure:
     }
   });
 
+  app.post("/api/property/valuation", async (req, res) => {
+    try {
+      const { address } = req.body;
+      
+      if (!address || typeof address !== "string") {
+        return res.status(400).json({ error: "Address is required" });
+      }
+
+      const apiKey = process.env.RENTCAST_API_KEY;
+
+      if (!apiKey) {
+        return res.status(503).json({ 
+          error: "Property valuation API not configured. Please add a RentCast API key.",
+          needsApiKey: true
+        });
+      }
+
+      const encodedAddress = encodeURIComponent(address);
+      const valuationUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}`;
+      
+      const response = await fetch(valuationUrl, {
+        headers: {
+          "X-Api-Key": apiKey,
+          "Accept": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("RentCast AVM API error:", response.status, errorText);
+        
+        if (response.status === 401) {
+          return res.status(401).json({ error: "Invalid API key" });
+        }
+        if (response.status === 404) {
+          return res.status(404).json({ error: "Property not found at this address" });
+        }
+        return res.status(response.status).json({ error: "Failed to fetch property valuation" });
+      }
+
+      const data = await response.json();
+      
+      const propertyData = {
+        address: data.formattedAddress || address,
+        estimatedValue: data.price || data.priceRangeLow || 0,
+        priceRangeLow: data.priceRangeLow || 0,
+        priceRangeHigh: data.priceRangeHigh || 0,
+        sqft: data.squareFootage || 0,
+        bedrooms: data.bedrooms || 0,
+        bathrooms: data.bathrooms || 0,
+        yearBuilt: data.yearBuilt || 0,
+        propertyType: data.propertyType || "Single Family",
+        lotSize: data.lotSize || 0,
+        pricePerSqft: data.squareFootage ? Math.round((data.price || 0) / data.squareFootage) : 0,
+        zillowLink: `https://www.zillow.com/homes/${encodeURIComponent(address.replace(/,/g, '').replace(/\s+/g, '-'))}_rb/`
+      };
+
+      res.json(propertyData);
+    } catch (error) {
+      console.error("Property valuation API error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to fetch property valuation" 
+      });
+    }
+  });
+
   app.post("/api/comps", async (req, res) => {
     try {
       const parseResult = compsRequestSchema.safeParse(req.body);
