@@ -7,16 +7,15 @@ import {
 
 /**
  * NEW FORMULA (User's Wholesale Model):
- * Wholesale Price = ((ARV × (1 - closingCostPct)) - (ARV × profitPct) - repairHigh) × 0.90
+ * Wholesale Price = (ARV × (1 - closingCostPct)) - (ARV × profitPct) - repairHigh
  * 
  * Where:
  * - ARV = After Repair Value (manual or from AVM blend)
  * - closingCostPct = 8-10% (default 8%)
  * - profitPct = 13-20% risk-based profit (default 20%)
  * - repairHigh = top end of repair estimate
- * - 10% overall downward adjustment applied at the end
  * 
- * Example: ((175000 × 0.92) - (175000 × 0.20) - 75000) × 0.90 = $45,900
+ * Example: (175000 × 0.92) - (175000 × 0.20) - 75000 = $51,000
  */
 export function calculateWholesalePrice(
   underwriting: UnderwritingOutput,
@@ -28,10 +27,7 @@ export function calculateWholesalePrice(
   const closingMultiplier = 1 - (closingCostPct / 100);
   const profitDeduction = arv * (profitPct / 100);
   
-  const baseWholesalePrice = (arv * closingMultiplier) - profitDeduction - repairHigh;
-  
-  // Apply 10% downward adjustment
-  const wholesalePrice = baseWholesalePrice * 0.90;
+  const wholesalePrice = (arv * closingMultiplier) - profitDeduction - repairHigh;
   
   return Math.round(Math.max(0, wholesalePrice));
 }
