@@ -199,7 +199,7 @@ export function calculateUnderwriting(
     ? manualRepairs 
     : Math.round(calculatedRepairBase);
   const repairHigh = manualRepairs && manualRepairs > 0 
-    ? Math.round(manualRepairs * 1.1) 
+    ? manualRepairs
     : Math.round(calculatedRepairBase * 1.2 + systemAdders.high);
   
   let marketabilityDiscountPct = 0;
