@@ -1,4 +1,4 @@
-# Deal Desk - 3-Engine Real Estate Underwriter
+# OfferIQ - 3-Engine Real Estate Underwriter
 
 ## Overview
 
@@ -43,7 +43,7 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` contains Drizzle table definitions and Zod validation schemas
 
 ### Key Files
-- `client/src/pages/deal-desk.tsx` - Main page with tabbed 3-engine layout
+- `client/src/pages/deal-desk.tsx` - Main OfferIQ page with tabbed 3-engine layout
 - `client/src/types.ts` - Complete type definitions for all engines
 - `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI
 - `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder

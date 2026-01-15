@@ -31,7 +31,7 @@ import type {
 } from "@/types";
 import { DEFAULT_OFFER_SETTINGS } from "@/types";
 
-const STORAGE_KEY = "deal-desk-state";
+const STORAGE_KEY = "offeriq-state";
 
 function getDefaultState(): DealState {
   return {
@@ -44,7 +44,7 @@ function getDefaultState(): DealState {
   };
 }
 
-export default function DealDesk() {
+export default function OfferIQ() {
   const { toast } = useToast();
   const [state, setState] = useState<DealState>(() => {
     if (typeof window !== "undefined") {
@@ -211,7 +211,7 @@ export default function DealDesk() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <FileText className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Deal Desk</h1>
+            <h1 className="text-xl font-bold">OfferIQ</h1>
             <Badge variant="secondary" className="text-xs">
               3-Engine Underwriter
             </Badge>
@@ -311,7 +311,7 @@ export default function DealDesk() {
 
       <footer className="border-t mt-12">
         <div className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-between text-sm text-muted-foreground">
-          <span>Deal Desk - 3-Engine Real Estate Underwriter</span>
+          <span>OfferIQ - 3-Engine Real Estate Underwriter</span>
           <span>Data auto-saves locally</span>
         </div>
       </footer>
