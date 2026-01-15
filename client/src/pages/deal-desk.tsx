@@ -75,9 +75,11 @@ export default function DealDesk() {
       state.seller,
       state.publicInfo,
       state.avmBaselines,
-      manualAsIsEstimate
+      manualAsIsEstimate,
+      manualARV,
+      manualRepairs
     );
-  }, [state.property, state.seller, state.publicInfo, state.avmBaselines, manualAsIsEstimate]);
+  }, [state.property, state.seller, state.publicInfo, state.avmBaselines, manualAsIsEstimate, manualARV, manualRepairs]);
 
   const offerOutput = useMemo(() => {
     if (!underwritingOutput) return null;

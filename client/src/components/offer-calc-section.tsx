@@ -65,118 +65,162 @@ export function OfferCalcSection({
               </Select>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Target Rule: {settings.targetRulePct}%</Label>
-                <span className="text-sm text-muted-foreground">of as-is value</span>
-              </div>
-              <Slider
-                data-testid="slider-target-rule"
-                value={[settings.targetRulePct]}
-                min={50}
-                max={90}
-                step={1}
-                onValueChange={([value]) => updateSetting("targetRulePct", value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Standard: 70% for wholesale, 65-75% for flips
-              </p>
-            </div>
+            {settings.strategy === "wholesale" ? (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Profit % (of ARV): {settings.profitPct}%</Label>
+                    <span className="text-sm text-muted-foreground">risk-based</span>
+                  </div>
+                  <Slider
+                    data-testid="slider-profit-pct"
+                    value={[settings.profitPct]}
+                    min={13}
+                    max={20}
+                    step={1}
+                    onValueChange={([value]) => updateSetting("profitPct", value)}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>13% (aggressive)</span>
+                    <span>20% (conservative)</span>
+                  </div>
+                </div>
 
-            <Separator />
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Closing Costs: {settings.closingCostPct}%</Label>
+                    <span className="text-sm text-muted-foreground">of ARV</span>
+                  </div>
+                  <Slider
+                    data-testid="slider-closing-cost-pct"
+                    value={[settings.closingCostPct]}
+                    min={6}
+                    max={12}
+                    step={0.5}
+                    onValueChange={([value]) => updateSetting("closingCostPct", value)}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>6%</span>
+                    <span>12%</span>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="closingCosts">Closing Costs</Label>
-                <Input
-                  id="closingCosts"
-                  type="number"
-                  data-testid="input-closing-costs"
-                  value={settings.closingCosts}
-                  onChange={(e) => updateSetting("closingCosts", Number(e.target.value) || 0)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="holdingBuffer">Holding Buffer</Label>
-                <Input
-                  id="holdingBuffer"
-                  type="number"
-                  data-testid="input-holding-buffer"
-                  value={settings.holdingBuffer}
-                  onChange={(e) => updateSetting("holdingBuffer", Number(e.target.value) || 0)}
-                />
-              </div>
-            </div>
+                <Separator />
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Assignment Fee: {formatCurrency(settings.assignmentFee)}</Label>
+                  </div>
+                  <Slider
+                    data-testid="slider-assignment-fee"
+                    value={[settings.assignmentFee]}
+                    min={5000}
+                    max={50000}
+                    step={1000}
+                    onValueChange={([value]) => updateSetting("assignmentFee", value)}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>$5k</span>
+                    <span>$50k</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Target Rule: {settings.targetRulePct}%</Label>
+                    <span className="text-sm text-muted-foreground">of as-is value</span>
+                  </div>
+                  <Slider
+                    data-testid="slider-target-rule"
+                    value={[settings.targetRulePct]}
+                    min={50}
+                    max={90}
+                    step={1}
+                    onValueChange={([value]) => updateSetting("targetRulePct", value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Standard: 65-75% for flips
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="closingCosts">Closing Costs</Label>
+                    <Input
+                      id="closingCosts"
+                      type="number"
+                      data-testid="input-closing-costs"
+                      value={settings.closingCosts}
+                      onChange={(e) => updateSetting("closingCosts", Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="holdingBuffer">Holding Buffer</Label>
+                    <Input
+                      id="holdingBuffer"
+                      type="number"
+                      data-testid="input-holding-buffer"
+                      value={settings.holdingBuffer}
+                      onChange={(e) => updateSetting("holdingBuffer", Number(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="desiredProfit">Desired Profit</Label>
+                  <Input
+                    id="desiredProfit"
+                    type="number"
+                    data-testid="input-desired-profit"
+                    value={settings.desiredProfit}
+                    onChange={(e) => updateSetting("desiredProfit", Number(e.target.value) || 0)}
+                  />
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Risk Buffer: {formatCurrency(settings.riskBuffer)}</Label>
+                  </div>
+                  <Slider
+                    data-testid="slider-risk-buffer"
+                    value={[settings.riskBuffer]}
+                    min={0}
+                    max={30000}
+                    step={1000}
+                    onValueChange={([value]) => updateSetting("riskBuffer", value)}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>$0 (aggressive)</span>
+                    <span>$30k (conservative)</span>
+                  </div>
+                </div>
+              </>
+            )}
 
             {settings.strategy !== "wholesale" && (
               <div>
-                <Label htmlFor="desiredProfit">Desired Profit</Label>
-                <Input
-                  id="desiredProfit"
-                  type="number"
-                  data-testid="input-desired-profit"
-                  value={settings.desiredProfit}
-                  onChange={(e) => updateSetting("desiredProfit", Number(e.target.value) || 0)}
-                />
-              </div>
-            )}
-
-            <Separator />
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Risk Buffer: {formatCurrency(settings.riskBuffer)}</Label>
-              </div>
-              <Slider
-                data-testid="slider-risk-buffer"
-                value={[settings.riskBuffer]}
-                min={0}
-                max={30000}
-                step={1000}
-                onValueChange={([value]) => updateSetting("riskBuffer", value)}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>$0 (aggressive)</span>
-                <span>$30k (conservative)</span>
-              </div>
-            </div>
-
-            {settings.strategy === "wholesale" && (
-              <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label>Assignment Fee: {formatCurrency(settings.assignmentFee)}</Label>
+                  <Label>Market Cooling Factor: {settings.marketCoolingFactorPct}%</Label>
                 </div>
                 <Slider
-                  data-testid="slider-assignment-fee"
-                  value={[settings.assignmentFee]}
-                  min={5000}
-                  max={50000}
-                  step={1000}
-                  onValueChange={([value]) => updateSetting("assignmentFee", value)}
+                  data-testid="slider-cooling-factor"
+                  value={[settings.marketCoolingFactorPct]}
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  onValueChange={([value]) => updateSetting("marketCoolingFactorPct", value)}
                 />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>$5k</span>
-                  <span>$50k</span>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Adjust for declining markets. 0% = stable, 10% = significant cooling
+                </p>
               </div>
             )}
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Market Cooling Factor: {settings.marketCoolingFactorPct}%</Label>
-              </div>
-              <Slider
-                data-testid="slider-cooling-factor"
-                value={[settings.marketCoolingFactorPct]}
-                min={0}
-                max={10}
-                step={0.5}
-                onValueChange={([value]) => updateSetting("marketCoolingFactorPct", value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Adjust for declining markets. 0% = stable, 10% = significant cooling
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -196,9 +240,24 @@ export function OfferCalcSection({
           <CardContent className="space-y-6">
             {offerOutput && underwritingOutput ? (
               <>
+                {settings.strategy === "wholesale" && (
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm space-y-1">
+                    <p className="font-medium mb-2">Formula Breakdown:</p>
+                    <div className="font-mono text-xs space-y-1">
+                      <p>ARV: {formatCurrency(underwritingOutput.arv)}</p>
+                      <p>× {(100 - settings.closingCostPct).toFixed(1)}% = {formatCurrency(underwritingOutput.arv * (1 - settings.closingCostPct/100))}</p>
+                      <p>− Profit ({settings.profitPct}% of ARV): {formatCurrency(underwritingOutput.arv * settings.profitPct/100)}</p>
+                      <p>− Repairs (high): {formatCurrency(underwritingOutput.repairHigh)}</p>
+                      <p className="font-bold pt-1 border-t border-border">= Wholesale Price: {formatCurrency(offerOutput.investorBuyPrice)}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Investor Buy Price</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {settings.strategy === "wholesale" ? "Wholesale Price" : "Investor Buy Price"}
+                    </p>
                     <p className="font-mono text-xl font-bold">{formatCurrency(offerOutput.investorBuyPrice)}</p>
                   </div>
                   <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 text-center">
@@ -208,9 +267,9 @@ export function OfferCalcSection({
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Margin</span>
+                  <span className="text-muted-foreground">Margin (ARV − Offer)</span>
                   <span className={`font-mono font-semibold ${offerOutput.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {formatCurrency(offerOutput.margin)} ({offerOutput.marginPct.toFixed(1)}%)
+                    {formatCurrency(underwritingOutput.arv - offerOutput.sellerOffer)} ({((underwritingOutput.arv - offerOutput.sellerOffer) / underwritingOutput.arv * 100).toFixed(1)}%)
                   </span>
                 </div>
 
