@@ -177,7 +177,7 @@ export function UnderwritingSection({
                   data-testid="input-property-address"
                   value={property.address || ""}
                   onChange={(e) => onPropertyChange({ ...property, address: e.target.value })}
-                  placeholder="406 Oakley St, Cambridge, MD 21613"
+                  placeholder="10 Victor Pkwy, Annapolis, MD 21043"
                   className="flex-1"
                 />
                 <Button
@@ -207,38 +207,6 @@ export function UnderwritingSection({
                   View on Zillow
                 </a>
               )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  data-testid="input-city"
-                  value={property.city || ""}
-                  onChange={(e) => onPropertyChange({ ...property, city: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="state">State</Label>
-                <Input
-                  id="state"
-                  data-testid="input-state"
-                  value={property.state || ""}
-                  onChange={(e) => onPropertyChange({ ...property, state: e.target.value })}
-                  maxLength={2}
-                />
-              </div>
-              <div>
-                <Label htmlFor="zip">ZIP</Label>
-                <Input
-                  id="zip"
-                  data-testid="input-zip"
-                  value={property.zip || ""}
-                  onChange={(e) => onPropertyChange({ ...property, zip: e.target.value })}
-                  maxLength={10}
-                />
-              </div>
             </div>
 
             <div>
