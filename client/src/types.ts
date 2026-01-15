@@ -56,6 +56,7 @@ export interface UnderwritingOutput {
   asIsLow: number;
   asIsBase: number;
   asIsHigh: number;
+  arv: number;
   repairLow: number;
   repairBase: number;
   repairHigh: number;
@@ -68,12 +69,14 @@ export interface UnderwritingOutput {
 
 export interface OfferSettings {
   strategy: "wholesale" | "flip" | "rental";
+  profitPct: number;
+  closingCostPct: number;
+  assignmentFee: number;
   targetRulePct: number;
   closingCosts: number;
   holdingBuffer: number;
   holdingBufferType: "pct" | "dollar";
   riskBuffer: number;
-  assignmentFee: number;
   desiredProfit: number;
   marketCoolingFactorPct: number;
   liquidityScore?: number;
@@ -138,12 +141,14 @@ export interface DealState {
 
 export const DEFAULT_OFFER_SETTINGS: OfferSettings = {
   strategy: "wholesale",
+  profitPct: 20,
+  closingCostPct: 8,
+  assignmentFee: 15000,
   targetRulePct: 70,
   closingCosts: 5000,
   holdingBuffer: 3000,
   holdingBufferType: "dollar",
   riskBuffer: 5000,
-  assignmentFee: 15000,
   desiredProfit: 20000,
   marketCoolingFactorPct: 0,
 };

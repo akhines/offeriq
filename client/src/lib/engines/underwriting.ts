@@ -171,27 +171,36 @@ export function calculateUnderwriting(
   seller: SellerInfo,
   publicInfo: PublicInfo,
   avmBaselines: AVMBaselines,
-  manualAsIsEstimate?: number
+  manualAsIsEstimate?: number,
+  manualARV?: number,
+  manualRepairs?: number
 ): UnderwritingOutput | null {
   const { blendedValue, blends } = calculateAVMBlend(avmBaselines);
   const { score: confidenceScore, missingData } = calculateConfidenceScore(property, avmBaselines, publicInfo);
   
   const baselineValue = blendedValue > 0 ? blendedValue : (manualAsIsEstimate || 0);
   
-  if (baselineValue <= 0) {
+  if (baselineValue <= 0 && (!manualARV || manualARV <= 0)) {
     return null;
   }
   
   const conditionScore = property.conditionScore ?? 5;
   const rehabPerSqft = getRehabPerSqft(conditionScore);
   const sqft = property.sqft || 1500;
-  const repairBase = sqft * rehabPerSqft;
+  const calculatedRepairBase = sqft * rehabPerSqft;
   
   const systemFailures = property.knownIssues ? detectSystemFailures(property.knownIssues) : [];
   const systemAdders = calculateSystemAdders(systemFailures);
   
-  const repairLow = Math.round(repairBase * 0.8 + systemAdders.low);
-  const repairHigh = Math.round(repairBase * 1.2 + systemAdders.high);
+  const repairLow = manualRepairs && manualRepairs > 0 
+    ? Math.round(manualRepairs * 0.9) 
+    : Math.round(calculatedRepairBase * 0.8 + systemAdders.low);
+  const repairBase = manualRepairs && manualRepairs > 0 
+    ? manualRepairs 
+    : Math.round(calculatedRepairBase);
+  const repairHigh = manualRepairs && manualRepairs > 0 
+    ? Math.round(manualRepairs * 1.1) 
+    : Math.round(calculatedRepairBase * 1.2 + systemAdders.high);
   
   let marketabilityDiscountPct = 0;
   if (conditionScore <= 3) marketabilityDiscountPct = 0.08;
@@ -202,15 +211,24 @@ export function calculateUnderwriting(
   
   const marketabilityDiscount = Math.round(baselineValue * marketabilityDiscountPct);
   
-  const asIsBase = Math.round(baselineValue - repairBase - marketabilityDiscount);
+  const asIsBase = baselineValue > 0 
+    ? Math.round(baselineValue - repairBase - marketabilityDiscount)
+    : 0;
   
   const spreadFactor = confidenceScore >= 80 ? 0.05 : confidenceScore >= 60 ? 0.10 : 0.15;
   const asIsLow = Math.round(asIsBase * (1 - spreadFactor));
   const asIsHigh = Math.round(asIsBase * (1 + spreadFactor));
   
+  const arv = manualARV && manualARV > 0 ? manualARV : baselineValue;
+  
   const drivers: string[] = [];
-  if (blendedValue > 0) {
+  if (manualARV && manualARV > 0) {
+    drivers.push(`Manual ARV: $${manualARV.toLocaleString()}`);
+  } else if (blendedValue > 0) {
     drivers.push(`AVM blend baseline: $${blendedValue.toLocaleString()}`);
+  }
+  if (manualRepairs && manualRepairs > 0) {
+    drivers.push(`Manual repairs estimate: $${manualRepairs.toLocaleString()}`);
   }
   if (conditionScore <= 5) {
     drivers.push(`Condition score (${conditionScore}/10) indicates significant repairs needed`);
@@ -229,8 +247,9 @@ export function calculateUnderwriting(
     asIsLow,
     asIsBase,
     asIsHigh,
+    arv,
     repairLow,
-    repairBase: Math.round(repairBase),
+    repairBase,
     repairHigh,
     confidenceScore,
     drivers: drivers.slice(0, 5),
