@@ -13,9 +13,6 @@ import {
   FileText,
   Calculator,
   Presentation,
-  Download,
-  Copy,
-  RotateCcw,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -217,33 +214,6 @@ export default function OfferIQ() {
             </Badge>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyDealSummary}
-              data-testid="button-copy-summary"
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copy Summary
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportJSON}
-              data-testid="button-export-json"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export JSON
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              data-testid="button-reset"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset
-            </Button>
             <ThemeToggle />
           </div>
         </div>
