@@ -63,16 +63,17 @@ Preferred communication style: Simple, everyday language.
 - Values normalized if any input is 0
 
 ### Wholesale Formula
-The wholesale calculation uses a specific formula:
+The wholesale calculation uses a specific formula with a 10% downward adjustment:
 ```
-Wholesale Price = (ARV × (1 - closingCostPct)) - (ARV × profitPct) - Repairs
+Wholesale Price = ((ARV × (1 - closingCostPct)) - (ARV × profitPct) - Repairs) × 0.90
 ```
 - **ARV**: After Repair Value (manual input or from AVM blend)
 - **closingCostPct**: 6-12% adjustable (default 8%)
 - **profitPct**: 13-20% risk-based slider
 - **Repairs**: Manual repairs estimate used directly (no contingency added)
+- **10% downward adjustment**: Applied at the end for conservative pricing
 
-Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
+Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $45,900 wholesale price
 
 ### Offer Ladder
 - Fast Yes: +8% above Fair price (for quick closes, motivated sellers)

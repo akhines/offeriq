@@ -248,6 +248,8 @@ export function OfferCalcSection({
                       <p>× {(100 - settings.closingCostPct).toFixed(1)}% = {formatCurrency(underwritingOutput.arv * (1 - settings.closingCostPct/100))}</p>
                       <p>− Profit ({settings.profitPct}% of ARV): {formatCurrency(underwritingOutput.arv * settings.profitPct/100)}</p>
                       <p>− Repairs (high): {formatCurrency(underwritingOutput.repairHigh)}</p>
+                      <p>= Subtotal: {formatCurrency((underwritingOutput.arv * (1 - settings.closingCostPct/100)) - (underwritingOutput.arv * settings.profitPct/100) - underwritingOutput.repairHigh)}</p>
+                      <p>× 90% (10% downward adj.)</p>
                       <p className="font-bold pt-1 border-t border-border">= Wholesale Price: {formatCurrency(offerOutput.investorBuyPrice)}</p>
                     </div>
                   </div>
