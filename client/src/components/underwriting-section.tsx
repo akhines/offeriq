@@ -105,11 +105,20 @@ export function UnderwritingSection({
       });
 
       if (data.estimatedValue) {
+        const rentcastAVMs = [];
+        if (data.estimatedValue) {
+          rentcastAVMs.push({ name: "RentCast Estimate", value: data.estimatedValue });
+        }
+        if (data.priceRangeLow) {
+          rentcastAVMs.push({ name: "RentCast Low", value: data.priceRangeLow });
+        }
+        if (data.priceRangeHigh) {
+          rentcastAVMs.push({ name: "RentCast High", value: data.priceRangeHigh });
+        }
+        
         onAVMChange({
           ...avmBaselines,
-          zillowZestimate: data.estimatedValue,
-          redfinEstimate: data.priceRangeHigh || undefined,
-          otherAVMs: data.priceRangeLow ? [{ name: "RentCast Low", value: data.priceRangeLow }] : avmBaselines.otherAVMs,
+          otherAVMs: rentcastAVMs.length > 0 ? rentcastAVMs : avmBaselines.otherAVMs,
         });
       }
 
