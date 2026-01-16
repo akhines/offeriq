@@ -427,6 +427,23 @@ export function UnderwritingSection({
               </div>
             </div>
 
+            {avmBaselines.otherAVMs && avmBaselines.otherAVMs.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium">RentCast Estimates (from API)</Label>
+                  <div className="mt-2 space-y-2">
+                    {avmBaselines.otherAVMs.map((avm, i) => (
+                      <div key={i} className="flex justify-between items-center p-2 rounded-md bg-muted">
+                        <span className="text-sm">{avm.name}</span>
+                        <span className="font-mono font-semibold">${avm.value.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             <Separator />
 
             <div>
