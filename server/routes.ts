@@ -357,15 +357,9 @@ Generate a JSON response with this structure:
       // Property records may return an array or single object
       const propertyRecord = Array.isArray(recordsData) ? recordsData[0] : recordsData;
       
-      // Generate Redfin link using their search URL format
-      // Format: street-address-city-state-zip with spaces as dashes
-      const formatForRedfin = (addr: string) => {
-        return addr
-          .replace(/,/g, '')
-          .replace(/\s+/g, '-')
-          .replace(/--+/g, '-');
-      };
-      const redfinLink = `https://www.redfin.com/search#query=${encodeURIComponent(address)}`;
+      // Generate Redfin link using their keyword search URL format
+      // This opens Redfin's search with the address as a keyword search
+      const redfinLink = `https://www.redfin.com/search?keyword=${encodeURIComponent(address)}`;
       
       const propertyData = {
         address: avmData.subjectProperty?.formattedAddress || avmData.formattedAddress || address,
