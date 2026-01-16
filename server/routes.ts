@@ -318,42 +318,60 @@ Generate a JSON response with this structure:
       }
 
       const encodedAddress = encodeURIComponent(address);
-      const valuationUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}`;
       
-      const response = await fetch(valuationUrl, {
-        headers: {
-          "X-Api-Key": apiKey,
-          "Accept": "application/json"
-        }
-      });
+      // Call both AVM and Property Records endpoints in parallel
+      const valuationUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}`;
+      const propertyRecordsUrl = `https://api.rentcast.io/v1/properties?address=${encodedAddress}`;
+      
+      const [avmResponse, recordsResponse] = await Promise.all([
+        fetch(valuationUrl, {
+          headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+        }),
+        fetch(propertyRecordsUrl, {
+          headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+        }).catch(() => null) // Don't fail if property records unavailable
+      ]);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("RentCast AVM API error:", response.status, errorText);
+      if (!avmResponse.ok) {
+        const errorText = await avmResponse.text();
+        console.error("RentCast AVM API error:", avmResponse.status, errorText);
         
-        if (response.status === 401) {
+        if (avmResponse.status === 401) {
           return res.status(401).json({ error: "Invalid API key" });
         }
-        if (response.status === 404) {
+        if (avmResponse.status === 404) {
           return res.status(404).json({ error: "Property not found at this address" });
         }
-        return res.status(response.status).json({ error: "Failed to fetch property valuation" });
+        return res.status(avmResponse.status).json({ error: "Failed to fetch property valuation" });
       }
 
-      const data = await response.json();
+      const avmData = await avmResponse.json();
+      
+      // Try to get property details from the records endpoint
+      let recordsData: any = null;
+      if (recordsResponse && recordsResponse.ok) {
+        recordsData = await recordsResponse.json();
+        console.log("RentCast Property Records response:", JSON.stringify(recordsData, null, 2));
+      }
+      
+      // Property records may return an array or single object
+      const propertyRecord = Array.isArray(recordsData) ? recordsData[0] : recordsData;
       
       const propertyData = {
-        address: data.formattedAddress || address,
-        estimatedValue: data.price || data.priceRangeLow || 0,
-        priceRangeLow: data.priceRangeLow || 0,
-        priceRangeHigh: data.priceRangeHigh || 0,
-        sqft: data.squareFootage || 0,
-        bedrooms: data.bedrooms || 0,
-        bathrooms: data.bathrooms || 0,
-        yearBuilt: data.yearBuilt || 0,
-        propertyType: data.propertyType || "Single Family",
-        lotSize: data.lotSize || 0,
-        pricePerSqft: data.squareFootage ? Math.round((data.price || 0) / data.squareFootage) : 0,
+        address: avmData.subjectProperty?.formattedAddress || avmData.formattedAddress || address,
+        estimatedValue: avmData.price || avmData.priceRangeLow || 0,
+        priceRangeLow: avmData.priceRangeLow || 0,
+        priceRangeHigh: avmData.priceRangeHigh || 0,
+        // Get property details from records endpoint (preferred) or AVM response
+        sqft: propertyRecord?.squareFootage || avmData.squareFootage || 0,
+        bedrooms: propertyRecord?.bedrooms || avmData.bedrooms || 0,
+        bathrooms: propertyRecord?.bathrooms || avmData.bathrooms || 0,
+        yearBuilt: propertyRecord?.yearBuilt || avmData.yearBuilt || 0,
+        propertyType: propertyRecord?.propertyType || avmData.propertyType || "Single Family",
+        lotSize: propertyRecord?.lotSize || avmData.lotSize || 0,
+        pricePerSqft: (propertyRecord?.squareFootage || avmData.squareFootage) 
+          ? Math.round((avmData.price || 0) / (propertyRecord?.squareFootage || avmData.squareFootage)) 
+          : 0,
         zillowLink: `https://www.zillow.com/homes/${encodeURIComponent(address.replace(/,/g, '').replace(/\s+/g, '-'))}_rb/`
       };
 
