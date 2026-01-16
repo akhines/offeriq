@@ -35,6 +35,8 @@ Preferred communication style: Simple, everyday language.
 - **AI Integration**: OpenAI API (via Replit AI Integrations) for negotiation plan generation
 
 **Key Endpoints:**
+- `POST /api/property/valuation` - Fetch property details and RentCast AVM estimates
+- `POST /api/comps` - Fetch comparable sales data from RentCast AVM endpoint
 - `POST /api/ai/presentation` - Generate AI-powered negotiation plan with ethical guardrails
 
 ### Data Storage
@@ -44,8 +46,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Files
 - `client/src/pages/deal-desk.tsx` - Main OfferIQ page with tabbed 3-engine layout
-- `client/src/types.ts` - Complete type definitions for all engines
-- `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI
+- `client/src/types.ts` - Complete type definitions for all engines (includes ComparableSale, CompsData)
+- `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI with comps integration
+- `client/src/components/comps-section.tsx` - Comparable sales display with sortable table and statistics
 - `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder
 - `client/src/components/offer-presentation-section.tsx` - AI presentation generator
 
@@ -84,6 +87,13 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - B: Medium confidence (≥60%), decent margin (≥20%)
 - C: Lower confidence or margin
 - D: Risky deal requiring careful consideration
+
+### Comparable Sales Analysis
+- Auto-fetched when property data is loaded
+- Uses RentCast AVM endpoint's `comparables` array (up to 15 comps)
+- Statistics: Avg $/Sqft, Median Price, Avg Price, Suggested ARV
+- Sortable table by price, sqft, $/sqft, distance, sold date
+- "Use Suggested ARV" button auto-populates Manual ARV field
 
 ### AI Ethical Guardrails
 - DISC profiles presented as hypotheses, not diagnoses

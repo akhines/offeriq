@@ -12,7 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, TrendingUp, AlertCircle, CheckCircle2, HelpCircle, Search, Loader2, ExternalLink } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput } from "@/types";
+import { CompsSection } from "@/components/comps-section";
+import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput, CompsData } from "@/types";
 
 interface UnderwritingSectionProps {
   property: PropertyInfo;
@@ -55,8 +56,61 @@ export function UnderwritingSection({
   onManualRepairsChange,
 }: UnderwritingSectionProps) {
   const [isLoadingValuation, setIsLoadingValuation] = useState(false);
+  const [isLoadingComps, setIsLoadingComps] = useState(false);
+  const [compsData, setCompsData] = useState<CompsData | null>(null);
   const [zillowLink, setZillowLink] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const fetchComps = async (address: string) => {
+    setIsLoadingComps(true);
+    setCompsData(null);
+    try {
+      const response = await fetch("/api/comps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error("Comps fetch failed:", data.error);
+        if (response.status === 404) {
+          toast({
+            title: "No Comparable Sales Found",
+            description: "Could not find recent sales near this property.",
+          });
+        }
+        return;
+      }
+
+      const data: CompsData = await response.json();
+      setCompsData(data);
+      
+      if (data.comps.length > 0) {
+        toast({
+          title: "Comparable Sales Loaded",
+          description: `Found ${data.comps.length} comparable properties.`,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch comps:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load comparable sales. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingComps(false);
+    }
+  };
+
+  const handleUseSuggestedARV = (arv: number) => {
+    onManualARVChange(arv);
+    toast({
+      title: "ARV Updated",
+      description: `Set ARV to ${formatCurrency(arv)} based on comparable sales analysis.`,
+    });
+  };
 
   const fetchPropertyValuation = async () => {
     if (!property.address?.trim()) {
@@ -125,6 +179,8 @@ export function UnderwritingSection({
       if (data.zillowLink) {
         setZillowLink(data.zillowLink);
       }
+
+      fetchComps(property.address);
 
       toast({
         title: "Property Data Loaded",
@@ -597,6 +653,13 @@ export function UnderwritingSection({
       </div>
 
       <div className="space-y-6">
+        <CompsSection
+          compsData={compsData}
+          isLoading={isLoadingComps}
+          subjectSqft={property.sqft}
+          onUseSuggestedARV={handleUseSuggestedARV}
+        />
+
         <Card className="border-primary/20">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">

@@ -403,7 +403,8 @@ Generate a JSON response with this structure:
       }
 
       const encodedAddress = encodeURIComponent(address);
-      const compsUrl = `https://api.rentcast.io/v1/sales/comparables?address=${encodedAddress}&limit=10&radius=1&daysOld=180`;
+      // Use AVM endpoint which includes comparables in response
+      const compsUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}&compCount=15`;
       
       const response = await fetch(compsUrl, {
         headers: {
@@ -458,20 +459,23 @@ Generate a JSON response with this structure:
         ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
         : medianPrice;
 
+      // Use AVM's suggestedARV (the price field) if available, otherwise calculate from comps
+      const avmSuggestedARV = data.price || suggestedARV;
+
       const compsData: CompsData = {
         comps: validComps,
-        subjectProperty: data.property ? {
-          address: data.property.formattedAddress || address,
-          estimatedValue: data.property.estimatedValue,
-          sqft: data.property.squareFootage,
-          bedrooms: data.property.bedrooms,
-          bathrooms: data.property.bathrooms,
-          yearBuilt: data.property.yearBuilt,
-          lotSize: data.property.lotSize
+        subjectProperty: data.subjectProperty ? {
+          address: data.subjectProperty.formattedAddress || address,
+          estimatedValue: data.price,
+          sqft: data.subjectProperty.squareFootage,
+          bedrooms: data.subjectProperty.bedrooms,
+          bathrooms: data.subjectProperty.bathrooms,
+          yearBuilt: data.subjectProperty.yearBuilt,
+          lotSize: data.subjectProperty.lotSize
         } : undefined,
         avgPricePerSqft,
         medianPrice,
-        suggestedARV
+        suggestedARV: avmSuggestedARV
       };
 
       res.json(compsData);
