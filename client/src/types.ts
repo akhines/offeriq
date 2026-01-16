@@ -175,3 +175,33 @@ export const AVM_WEIGHTS = {
   redfin: 0.35,
   other: 0.20,
 };
+
+export interface ComparableSale {
+  address: string;
+  price: number;
+  sqft: number;
+  pricePerSqft: number;
+  bedrooms: number;
+  bathrooms: number;
+  yearBuilt: number;
+  soldDate: string;
+  distanceMiles: number;
+  daysOnMarket?: number;
+  propertyType?: string;
+}
+
+export interface CompsData {
+  comps: ComparableSale[];
+  subjectProperty?: {
+    address: string;
+    estimatedValue?: number;
+    sqft?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    yearBuilt?: number;
+    lotSize?: number;
+  };
+  avgPricePerSqft: number;
+  medianPrice: number;
+  suggestedARV: number;
+}
