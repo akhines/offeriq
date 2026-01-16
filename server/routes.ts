@@ -357,6 +357,16 @@ Generate a JSON response with this structure:
       // Property records may return an array or single object
       const propertyRecord = Array.isArray(recordsData) ? recordsData[0] : recordsData;
       
+      // Generate Redfin link using their search URL format
+      // Format: street-address-city-state-zip with spaces as dashes
+      const formatForRedfin = (addr: string) => {
+        return addr
+          .replace(/,/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/--+/g, '-');
+      };
+      const redfinLink = `https://www.redfin.com/search#query=${encodeURIComponent(address)}`;
+      
       const propertyData = {
         address: avmData.subjectProperty?.formattedAddress || avmData.formattedAddress || address,
         estimatedValue: avmData.price || avmData.priceRangeLow || 0,
@@ -372,7 +382,8 @@ Generate a JSON response with this structure:
         pricePerSqft: (propertyRecord?.squareFootage || avmData.squareFootage) 
           ? Math.round((avmData.price || 0) / (propertyRecord?.squareFootage || avmData.squareFootage)) 
           : 0,
-        zillowLink: `https://www.zillow.com/homes/${encodeURIComponent(address.replace(/,/g, '').replace(/\s+/g, '-'))}_rb/`
+        zillowLink: `https://www.zillow.com/homes/${encodeURIComponent(address.replace(/,/g, '').replace(/\s+/g, '-'))}_rb/`,
+        redfinLink: redfinLink
       };
 
       res.json(propertyData);

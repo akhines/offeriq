@@ -177,10 +177,13 @@ export function UnderwritingSection({
         });
       }
 
-      // Generate Zillow and Redfin links from address
-      const addressForUrl = encodeURIComponent(property.address);
-      setZillowLink(`https://www.zillow.com/homes/${addressForUrl}_rb/`);
-      setRedfinLink(`https://www.redfin.com/search?search-input=${addressForUrl}`);
+      // Use Zillow and Redfin links from API response
+      if (data.zillowLink) {
+        setZillowLink(data.zillowLink);
+      }
+      if (data.redfinLink) {
+        setRedfinLink(data.redfinLink);
+      }
 
       fetchComps(property.address, mapPropertyType(data.propertyType));
 
