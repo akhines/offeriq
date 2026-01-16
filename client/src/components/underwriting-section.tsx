@@ -59,6 +59,7 @@ export function UnderwritingSection({
   const [isLoadingComps, setIsLoadingComps] = useState(false);
   const [compsData, setCompsData] = useState<CompsData | null>(null);
   const [zillowLink, setZillowLink] = useState<string | null>(null);
+  const [redfinLink, setRedfinLink] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchComps = async (address: string, propertyType?: string) => {
@@ -176,9 +177,10 @@ export function UnderwritingSection({
         });
       }
 
-      if (data.zillowLink) {
-        setZillowLink(data.zillowLink);
-      }
+      // Generate Zillow and Redfin links from address
+      const addressForUrl = encodeURIComponent(property.address);
+      setZillowLink(`https://www.zillow.com/homes/${addressForUrl}_rb/`);
+      setRedfinLink(`https://www.redfin.com/search?search-input=${addressForUrl}`);
 
       fetchComps(property.address, mapPropertyType(data.propertyType));
 
@@ -517,6 +519,41 @@ export function UnderwritingSection({
             <p className="text-xs text-muted-foreground">
               AVMs are estimates only. Always verify with comparable sales analysis.
             </p>
+
+            {(zillowLink || redfinLink) && (
+              <>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium">Property Links</Label>
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    {zillowLink && (
+                      <a
+                        href={zillowLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                        data-testid="link-zillow-avm"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View on Zillow
+                      </a>
+                    )}
+                    {redfinLink && (
+                      <a
+                        href={redfinLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                        data-testid="link-redfin-avm"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View on Redfin
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
