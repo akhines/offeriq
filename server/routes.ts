@@ -392,7 +392,7 @@ Generate a JSON response with this structure:
         return res.status(400).json({ error: validationError.toString() });
       }
 
-      const { address } = parseResult.data;
+      const { address, propertyType } = parseResult.data;
       const apiKey = process.env.RENTCAST_API_KEY;
 
       if (!apiKey) {
@@ -442,7 +442,32 @@ Generate a JSON response with this structure:
         propertyType: comp.propertyType
       }));
 
-      const validComps = comps.filter(c => c.price > 0 && c.sqft > 0);
+      // Filter by property type if specified
+      let filteredComps = comps.filter(c => c.price > 0 && c.sqft > 0);
+      
+      if (propertyType) {
+        const normalizedType = propertyType.toLowerCase().replace(/_/g, " ");
+        filteredComps = filteredComps.filter(c => {
+          if (!c.propertyType) return false;
+          const compType = c.propertyType.toLowerCase().replace(/_/g, " ");
+          // Match property types flexibly
+          if (normalizedType.includes("single") && compType.includes("single")) return true;
+          if (normalizedType.includes("multi") && compType.includes("multi")) return true;
+          if (normalizedType.includes("condo") && compType.includes("condo")) return true;
+          if (normalizedType.includes("townhouse") && (compType.includes("town") || compType.includes("row"))) return true;
+          if (normalizedType.includes("land") && compType.includes("land")) return true;
+          if (normalizedType.includes("commercial") && compType.includes("commercial")) return true;
+          return compType.includes(normalizedType) || normalizedType.includes(compType);
+        });
+        
+        // If no matches after filtering, fall back to all valid comps with a note
+        if (filteredComps.length === 0) {
+          console.log(`No ${propertyType} comps found, using all property types`);
+          filteredComps = comps.filter(c => c.price > 0 && c.sqft > 0);
+        }
+      }
+      
+      const validComps = filteredComps;
       const prices = validComps.map(c => c.price);
       const pricesPerSqft = validComps.map(c => c.pricePerSqft);
       

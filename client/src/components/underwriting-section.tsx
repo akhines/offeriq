@@ -61,14 +61,14 @@ export function UnderwritingSection({
   const [zillowLink, setZillowLink] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchComps = async (address: string) => {
+  const fetchComps = async (address: string, propertyType?: string) => {
     setIsLoadingComps(true);
     setCompsData(null);
     try {
       const response = await fetch("/api/comps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address, propertyType }),
       });
 
       if (!response.ok) {
@@ -180,7 +180,7 @@ export function UnderwritingSection({
         setZillowLink(data.zillowLink);
       }
 
-      fetchComps(property.address);
+      fetchComps(property.address, mapPropertyType(data.propertyType));
 
       toast({
         title: "Property Data Loaded",

@@ -301,6 +301,7 @@ export interface CompsData {
 
 export const compsRequestSchema = z.object({
   address: z.string().min(5, "Please enter a valid address"),
+  propertyType: z.string().optional(),
 });
 
 export type CompsRequest = z.infer<typeof compsRequestSchema>;
