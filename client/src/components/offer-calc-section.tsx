@@ -267,6 +267,13 @@ export function OfferCalcSection({
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Offer is % of ARV</span>
+                  <span className="font-mono font-semibold" data-testid="text-offer-arv-percent">
+                    {((offerOutput.sellerOffer / underwritingOutput.arv) * 100).toFixed(1)}%
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Margin (ARV − Offer)</span>
                   <span className={`font-mono font-semibold ${offerOutput.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
                     {formatCurrency(underwritingOutput.arv - offerOutput.sellerOffer)} ({((underwritingOutput.arv - offerOutput.sellerOffer) / underwritingOutput.arv * 100).toFixed(1)}%)
