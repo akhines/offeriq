@@ -205,3 +205,24 @@ export interface CompsData {
   medianPrice: number;
   suggestedARV: number;
 }
+
+export interface UserComp {
+  id: string;
+  address: string;
+  price: number;
+  sqft: number;
+  pricePerSqft: number;
+  bedrooms: number;
+  bathrooms: number;
+  yearBuilt?: number;
+  soldDate?: string;
+  distanceMiles?: number;
+  sourceUrl?: string;
+  notes?: string;
+}
+
+export interface UserCompsState {
+  comps: UserComp[];
+  confidenceScore: number;
+  suggestedARV: number;
+}

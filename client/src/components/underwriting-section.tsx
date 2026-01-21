@@ -13,7 +13,8 @@ import { AlertTriangle, TrendingUp, AlertCircle, CheckCircle2, HelpCircle, Searc
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { CompsSection } from "@/components/comps-section";
-import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput, CompsData } from "@/types";
+import { UserCompsSection } from "@/components/user-comps-section";
+import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput, CompsData, UserCompsState } from "@/types";
 
 interface UnderwritingSectionProps {
   property: PropertyInfo;
@@ -31,6 +32,8 @@ interface UnderwritingSectionProps {
   onManualARVChange: (value: number) => void;
   manualRepairs: number;
   onManualRepairsChange: (value: number) => void;
+  userComps: UserCompsState;
+  onUserCompsChange: (userComps: UserCompsState) => void;
 }
 
 function formatCurrency(value: number | undefined): string {
@@ -54,6 +57,8 @@ export function UnderwritingSection({
   onManualARVChange,
   manualRepairs,
   onManualRepairsChange,
+  userComps,
+  onUserCompsChange,
 }: UnderwritingSectionProps) {
   const [isLoadingValuation, setIsLoadingValuation] = useState(false);
   const [isLoadingComps, setIsLoadingComps] = useState(false);
@@ -698,6 +703,13 @@ export function UnderwritingSection({
           isLoading={isLoadingComps}
           subjectSqft={property.sqft}
           onUseSuggestedARV={handleUseSuggestedARV}
+        />
+
+        <UserCompsSection
+          userComps={userComps}
+          onUserCompsChange={onUserCompsChange}
+          subjectSqft={property.sqft}
+          onUseUserARV={handleUseSuggestedARV}
         />
 
         <Card className="border-primary/20">

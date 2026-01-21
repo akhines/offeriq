@@ -25,8 +25,19 @@ import type {
   OfferOutput,
   PresentationOutput,
   DealState,
+  UserCompsState,
 } from "@/types";
 import { DEFAULT_OFFER_SETTINGS } from "@/types";
+
+const USER_COMPS_STORAGE_KEY = "offeriq-user-comps";
+
+function getDefaultUserComps(): UserCompsState {
+  return {
+    comps: [],
+    confidenceScore: 50,
+    suggestedARV: 0,
+  };
+}
 
 const STORAGE_KEY = "offeriq-state";
 
@@ -61,10 +72,32 @@ export default function OfferIQ() {
   const [manualARV, setManualARV] = useState(0);
   const [manualRepairs, setManualRepairs] = useState(0);
   const [presentationOutput, setPresentationOutput] = useState<PresentationOutput | null>(null);
+  
+  const [userComps, setUserComps] = useState<UserCompsState>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(USER_COMPS_STORAGE_KEY);
+      if (saved) {
+        try {
+          return { ...getDefaultUserComps(), ...JSON.parse(saved) };
+        } catch {
+          return getDefaultUserComps();
+        }
+      }
+    }
+    return getDefaultUserComps();
+  });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    localStorage.setItem(USER_COMPS_STORAGE_KEY, JSON.stringify(userComps));
+  }, [userComps]);
+
+  const handleUserCompsChange = useCallback((newUserComps: UserCompsState) => {
+    setUserComps(newUserComps);
+  }, []);
 
   const underwritingOutput = useMemo(() => {
     return calculateUnderwriting(
@@ -253,6 +286,8 @@ export default function OfferIQ() {
               onManualARVChange={setManualARV}
               manualRepairs={manualRepairs}
               onManualRepairsChange={setManualRepairs}
+              userComps={userComps}
+              onUserCompsChange={handleUserCompsChange}
             />
           </TabsContent>
 
