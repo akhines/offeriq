@@ -95,6 +95,14 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - Sortable table by price, sqft, $/sqft, distance, sold date
 - "Use Suggested ARV" button auto-populates Manual ARV field
 
+### User-Submitted Comps
+- Users can add their own comparable sales manually (address, price, sqft, beds/baths, sold date)
+- Confidence slider (0-100%) weights user comps vs API comps for ARV calculation
+- Blending formula: `blendedARV = (userARV × confidence%) + (apiARV × (100% - confidence%))`
+- At 100% confidence, only user comps are used; at 0%, only API comps
+- Sortable table, statistics (Avg $/SqFt, Avg Price, Your ARV)
+- Data persisted to localStorage
+
 ### AI Ethical Guardrails
 - DISC profiles presented as hypotheses, not diagnoses
 - 6 Human Needs assessments include confirming questions
