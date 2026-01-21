@@ -24,10 +24,14 @@ import {
   Clock,
   Loader2,
   Lock,
+  Link2,
+  ExternalLink,
+  Image,
+  List,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { SellerInfo, PresentationInput, PresentationOutput, OfferOutput, UnderwritingOutput, CallNote } from "@/types";
+import type { SellerInfo, PresentationInput, PresentationOutput, OfferOutput, UnderwritingOutput, CallNote, CompLink } from "@/types";
 
 const GHL_INTEGRATION_STATUS = {
   available: false,
@@ -85,6 +89,9 @@ export function OfferPresentationSection({
   const { toast } = useToast();
   const [newNoteDate, setNewNoteDate] = useState(new Date().toISOString().split("T")[0]);
   const [newNoteText, setNewNoteText] = useState("");
+  const [newCompLinkUrl, setNewCompLinkUrl] = useState("");
+  const [newCompLinkLabel, setNewCompLinkLabel] = useState("");
+  const [compLinkDisplayMode, setCompLinkDisplayMode] = useState<"list" | "preview">("list");
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -127,6 +134,36 @@ export function OfferPresentationSection({
       ...presentationInput,
       callNotes: (presentationInput.callNotes || []).filter((n) => n.id !== id),
     });
+  };
+
+  const addCompLink = () => {
+    if (!newCompLinkUrl.trim()) return;
+    const newLink: CompLink = {
+      id: Date.now().toString(),
+      url: newCompLinkUrl.trim(),
+      label: newCompLinkLabel.trim() || undefined,
+    };
+    onPresentationInputChange({
+      ...presentationInput,
+      compLinks: [...(presentationInput.compLinks || []), newLink],
+    });
+    setNewCompLinkUrl("");
+    setNewCompLinkLabel("");
+  };
+
+  const removeCompLink = (id: string) => {
+    onPresentationInputChange({
+      ...presentationInput,
+      compLinks: (presentationInput.compLinks || []).filter((l) => l.id !== id),
+    });
+  };
+
+  const getDomainFromUrl = (url: string) => {
+    try {
+      return new URL(url).hostname.replace("www.", "");
+    } catch {
+      return url;
+    }
   };
 
   const canGenerate = underwritingOutput && offerOutput;
@@ -276,6 +313,168 @@ export function OfferPresentationSection({
                 placeholder="Any previous offers discussed..."
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Supporting Comp Links
+            </CardTitle>
+            <CardDescription>Paste MLS or listing URLs to display as references</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="compLinkUrl">Link URL</Label>
+                  <Input
+                    id="compLinkUrl"
+                    data-testid="input-comp-link-url"
+                    value={newCompLinkUrl}
+                    onChange={(e) => setNewCompLinkUrl(e.target.value)}
+                    placeholder="https://zillow.com/homedetails/..."
+                    onKeyDown={(e) => e.key === "Enter" && addCompLink()}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="compLinkLabel">Label (optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="compLinkLabel"
+                      data-testid="input-comp-link-label"
+                      value={newCompLinkLabel}
+                      onChange={(e) => setNewCompLinkLabel(e.target.value)}
+                      placeholder="123 Main St - $350k"
+                      onKeyDown={(e) => e.key === "Enter" && addCompLink()}
+                    />
+                    <Button size="icon" onClick={addCompLink} data-testid="button-add-comp-link">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {(presentationInput.compLinks || []).length > 0 && (
+              <>
+                <Separator />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    {presentationInput.compLinks?.length} link{(presentationInput.compLinks?.length || 0) !== 1 ? "s" : ""} added
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={compLinkDisplayMode === "list" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCompLinkDisplayMode("list")}
+                      data-testid="button-display-list"
+                    >
+                      <List className="h-4 w-4 mr-1" />
+                      List
+                    </Button>
+                    <Button
+                      variant={compLinkDisplayMode === "preview" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCompLinkDisplayMode("preview")}
+                      data-testid="button-display-preview"
+                    >
+                      <Image className="h-4 w-4 mr-1" />
+                      Preview
+                    </Button>
+                  </div>
+                </div>
+
+                {compLinkDisplayMode === "list" ? (
+                  <div className="space-y-2">
+                    {(presentationInput.compLinks || []).map((link) => (
+                      <div
+                        key={link.id}
+                        className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/50 border"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+                          >
+                            {link.label || getDomainFromUrl(link.url)}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          <p className="text-xs text-muted-foreground truncate">{link.url}</p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removeCompLink(link.id)}
+                          data-testid={`button-remove-comp-link-${link.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(presentationInput.compLinks || []).map((link) => (
+                      <div key={link.id} className="rounded-lg border overflow-hidden">
+                        <div className="flex items-center justify-between p-2 bg-muted/50">
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-primary hover:underline flex items-center gap-1 truncate"
+                          >
+                            {link.label || getDomainFromUrl(link.url)}
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                          </a>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeCompLink(link.id)}
+                            data-testid={`button-remove-comp-link-preview-${link.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                        <div className="aspect-video bg-muted relative">
+                          <iframe
+                            src={link.url}
+                            className="w-full h-full border-0"
+                            sandbox="allow-scripts allow-same-origin"
+                            loading="lazy"
+                            title={link.label || "Comp preview"}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-muted/80 opacity-0 hover:opacity-100 transition-opacity">
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md"
+                            >
+                              Open in new tab <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground text-center">
+                      Note: Some sites block embedding. Click to open in a new tab if preview doesn't load.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {(presentationInput.compLinks || []).length === 0 && (
+              <div className="text-center py-4 text-muted-foreground">
+                <Link2 className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No comp links added yet</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

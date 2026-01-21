@@ -104,6 +104,12 @@ export interface CallNote {
   text: string;
 }
 
+export interface CompLink {
+  id: string;
+  url: string;
+  label?: string;
+}
+
 export interface PresentationInput {
   callNotes: CallNote[];
   transcriptPaste?: string;
@@ -111,6 +117,7 @@ export interface PresentationInput {
   preferredCommunication?: "call" | "text" | "email";
   tonePreference?: "professional" | "casual";
   priorOffers?: string;
+  compLinks?: CompLink[];
 }
 
 export interface PresentationOutput {
