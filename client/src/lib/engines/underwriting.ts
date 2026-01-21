@@ -8,6 +8,7 @@ import {
   CONDITION_REHAB_MAP,
   SYSTEM_FAILURE_ADDERS,
   AVM_WEIGHTS,
+  UserCompsState,
 } from "@/types";
 
 export function getRehabPerSqft(conditionScore: number): number {
@@ -166,6 +167,28 @@ export function calculateConfidenceScore(
   };
 }
 
+export function blendARVWithUserComps(
+  apiARV: number,
+  userComps: UserCompsState | undefined
+): { blendedARV: number; userCompsWeight: number } {
+  if (!userComps || userComps.comps.length === 0 || userComps.suggestedARV <= 0) {
+    return { blendedARV: apiARV, userCompsWeight: 0 };
+  }
+  
+  if (apiARV <= 0) {
+    return { blendedARV: userComps.suggestedARV, userCompsWeight: 1 };
+  }
+  
+  const userWeight = userComps.confidenceScore / 100;
+  const apiWeight = 1 - userWeight;
+  
+  const blendedARV = Math.round(
+    (userComps.suggestedARV * userWeight) + (apiARV * apiWeight)
+  );
+  
+  return { blendedARV, userCompsWeight: userWeight };
+}
+
 export function calculateUnderwriting(
   property: PropertyInfo,
   seller: SellerInfo,
@@ -173,7 +196,8 @@ export function calculateUnderwriting(
   avmBaselines: AVMBaselines,
   manualAsIsEstimate?: number,
   manualARV?: number,
-  manualRepairs?: number
+  manualRepairs?: number,
+  userComps?: UserCompsState
 ): UnderwritingOutput | null {
   const { blendedValue, blends } = calculateAVMBlend(avmBaselines);
   const { score: confidenceScore, missingData } = calculateConfidenceScore(property, avmBaselines, publicInfo);
@@ -219,13 +243,25 @@ export function calculateUnderwriting(
   const asIsLow = Math.round(asIsBase * (1 - spreadFactor));
   const asIsHigh = Math.round(asIsBase * (1 + spreadFactor));
   
-  const arv = manualARV && manualARV > 0 ? manualARV : baselineValue;
-  
+  let arv: number;
   const drivers: string[] = [];
+  
   if (manualARV && manualARV > 0) {
+    arv = manualARV;
     drivers.push(`Manual ARV: $${manualARV.toLocaleString()}`);
-  } else if (blendedValue > 0) {
-    drivers.push(`AVM blend baseline: $${blendedValue.toLocaleString()}`);
+  } else if (userComps && userComps.comps.length > 0 && userComps.suggestedARV > 0) {
+    const { blendedARV, userCompsWeight } = blendARVWithUserComps(baselineValue, userComps);
+    arv = blendedARV;
+    if (userCompsWeight > 0 && baselineValue > 0) {
+      drivers.push(`Blended ARV: ${Math.round(userCompsWeight * 100)}% user comps ($${userComps.suggestedARV.toLocaleString()}) + ${Math.round((1 - userCompsWeight) * 100)}% API ($${baselineValue.toLocaleString()})`);
+    } else if (userCompsWeight === 1) {
+      drivers.push(`User comps ARV: $${userComps.suggestedARV.toLocaleString()} (${userComps.comps.length} comps @ ${userComps.confidenceScore}% confidence)`);
+    }
+  } else {
+    arv = baselineValue;
+    if (blendedValue > 0) {
+      drivers.push(`AVM blend baseline: $${blendedValue.toLocaleString()}`);
+    }
   }
   if (manualRepairs && manualRepairs > 0) {
     drivers.push(`Manual repairs estimate: $${manualRepairs.toLocaleString()}`);

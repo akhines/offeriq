@@ -107,9 +107,10 @@ export default function OfferIQ() {
       state.avmBaselines,
       manualAsIsEstimate,
       manualARV,
-      manualRepairs
+      manualRepairs,
+      userComps
     );
-  }, [state.property, state.seller, state.publicInfo, state.avmBaselines, manualAsIsEstimate, manualARV, manualRepairs]);
+  }, [state.property, state.seller, state.publicInfo, state.avmBaselines, manualAsIsEstimate, manualARV, manualRepairs, userComps]);
 
   const offerOutput = useMemo(() => {
     if (!underwritingOutput) return null;
@@ -147,7 +148,9 @@ export default function OfferIQ() {
       setManualARV(0);
       setManualRepairs(0);
       setPresentationOutput(null);
+      setUserComps(getDefaultUserComps());
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(USER_COMPS_STORAGE_KEY);
       toast({ description: "All data has been reset" });
     }
   };
