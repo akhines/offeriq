@@ -36,6 +36,7 @@ interface UserCompsSectionProps {
   onUserCompsChange: (state: UserCompsState) => void;
   onUseUserARV?: (arv: number) => void;
   subjectSqft?: number;
+  embedded?: boolean;
 }
 
 type SortField = "price" | "pricePerSqft" | "sqft" | "distanceMiles";
@@ -68,6 +69,7 @@ export function UserCompsSection({
   onUserCompsChange,
   onUseUserARV,
   subjectSqft,
+  embedded = false,
 }: UserCompsSectionProps) {
   const [urlInput, setUrlInput] = useState("");
   const [isAddingManual, setIsAddingManual] = useState(false);
@@ -174,20 +176,8 @@ export function UserCompsSection({
     return "Low";
   };
 
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <User className="h-5 w-5" />
-          Your Comps
-          {userComps.comps.length > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {userComps.comps.length} comp{userComps.comps.length !== 1 ? "s" : ""}
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const content = (
+    <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="flex-1">
             <Input
@@ -476,13 +466,48 @@ export function UserCompsSection({
           </>
         )}
 
-        {userComps.comps.length === 0 && (
-          <div className="text-center py-6 text-muted-foreground">
-            <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No comps added yet.</p>
-            <p className="text-sm">Add your own comparable sales to refine the ARV.</p>
-          </div>
-        )}
+      {userComps.comps.length === 0 && (
+        <div className="text-center py-6 text-muted-foreground">
+          <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>No comps added yet.</p>
+          <p className="text-sm">Add your own comparable sales to refine the ARV.</p>
+        </div>
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div>
+        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+          <User className="h-4 w-4" />
+          Your Comps
+          {userComps.comps.length > 0 && (
+            <Badge variant="secondary" className="ml-1">
+              {userComps.comps.length} comp{userComps.comps.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
+        </h4>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <User className="h-5 w-5" />
+          Your Comps
+          {userComps.comps.length > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {userComps.comps.length} comp{userComps.comps.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {content}
       </CardContent>
     </Card>
   );

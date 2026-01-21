@@ -568,13 +568,13 @@ export function UnderwritingSection({
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-lg">Manual Overrides</CardTitle>
+              <CardTitle className="text-lg">Manual Overrides & Your Comps</CardTitle>
               <Tooltip>
                 <TooltipTrigger>
                   <HelpCircle className="h-4 w-4 text-muted-foreground" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="max-w-xs">Override calculated values with your own estimates based on comps analysis or contractor quotes.</p>
+                  <p className="max-w-xs">Override calculated values with your own estimates or add your own comparable sales.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -610,6 +610,16 @@ export function UnderwritingSection({
                 </p>
               </div>
             </div>
+            
+            <Separator />
+            
+            <UserCompsSection
+              userComps={userComps}
+              onUserCompsChange={onUserCompsChange}
+              subjectSqft={property.sqft}
+              onUseUserARV={handleUseSuggestedARV}
+              embedded={true}
+            />
           </CardContent>
         </Card>
 
@@ -703,13 +713,6 @@ export function UnderwritingSection({
           isLoading={isLoadingComps}
           subjectSqft={property.sqft}
           onUseSuggestedARV={handleUseSuggestedARV}
-        />
-
-        <UserCompsSection
-          userComps={userComps}
-          onUserCompsChange={onUserCompsChange}
-          subjectSqft={property.sqft}
-          onUseUserARV={handleUseSuggestedARV}
         />
 
         <Card className="border-primary/20">
