@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { CompsSection } from "@/components/comps-section";
 import { UserCompsSection } from "@/components/user-comps-section";
+import { AddressAutocomplete, type PlaceDetails } from "@/components/address-autocomplete";
 import type { PropertyInfo, SellerInfo, PublicInfo, AVMBaselines, UnderwritingOutput, CompsData, UserCompsState } from "@/types";
 
 interface UnderwritingSectionProps {
@@ -238,13 +239,19 @@ export function UnderwritingSection({
             <div>
               <Label htmlFor="address">Property Address *</Label>
               <div className="flex gap-2">
-                <Input
-                  id="address"
-                  data-testid="input-property-address"
+                <AddressAutocomplete
                   value={property.address || ""}
-                  onChange={(e) => onPropertyChange({ ...property, address: e.target.value })}
-                  placeholder="10 Victor Pkwy, Annapolis, MD 21043"
-                  className="flex-1"
+                  onChange={(address, placeDetails) => {
+                    onPropertyChange({
+                      ...property,
+                      address,
+                      city: placeDetails?.city || property.city,
+                      state: placeDetails?.state || property.state,
+                      zip: placeDetails?.zip || property.zip,
+                    });
+                  }}
+                  placeholder="Start typing an address..."
+                  data-testid="input-property-address"
                 />
                 <Button
                   type="button"
