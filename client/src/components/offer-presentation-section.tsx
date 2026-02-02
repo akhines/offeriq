@@ -664,13 +664,34 @@ export function OfferPresentationSection({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-1">
-                    {(presentationOutput.objectionHandling || []).map((obj, i) => (
-                      <li key={i} className="text-sm flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        {obj}
-                      </li>
-                    ))}
+                  <ul className="space-y-3">
+                    {(presentationOutput.objectionHandling || []).map((obj, i) => {
+                      // Handle both string and object formats from AI
+                      if (typeof obj === 'string') {
+                        return (
+                          <li key={i} className="text-sm flex items-start gap-2">
+                            <span className="text-primary">•</span>
+                            {obj}
+                          </li>
+                        );
+                      }
+                      // Handle object format: {Objection: "...", Response: "..."}
+                      const objData = obj as unknown as { Objection?: string; Response?: string; objection?: string; response?: string };
+                      const objection = objData.Objection || objData.objection || '';
+                      const response = objData.Response || objData.response || '';
+                      return (
+                        <li key={i} className="text-sm space-y-1">
+                          <div className="flex items-start gap-2">
+                            <span className="text-primary font-medium">Q:</span>
+                            <span className="italic text-muted-foreground">"{objection}"</span>
+                          </div>
+                          <div className="flex items-start gap-2 ml-4">
+                            <span className="text-green-600 dark:text-green-400 font-medium">A:</span>
+                            <span>{response}</span>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </CardContent>
               </Card>
