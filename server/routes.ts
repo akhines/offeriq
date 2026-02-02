@@ -1,8 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, type NegotiationPlan, type CompsData, type ComparableSale } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, type SavedPresentation } from "@shared/schema";
 import { fromError } from "zod-validation-error";
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { randomUUID } from "crypto";
+
+// In-memory store for saved presentations (could be moved to database later)
+const savedPresentations: Map<string, SavedPresentation> = new Map();
 
 export async function registerRoutes(
   httpServer: Server,
@@ -513,6 +518,136 @@ Generate a JSON response with this structure:
       console.error("Comps API error:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to fetch comparable sales" 
+      });
+    }
+  });
+
+  // Register object storage routes
+  registerObjectStorageRoutes(app);
+
+  // Save presentation PDF endpoint
+  app.post("/api/presentations/save", async (req, res) => {
+    try {
+      const parseResult = createPresentationSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromError(parseResult.error);
+        return res.status(400).json({ error: validationError.toString() });
+      }
+
+      const { propertyAddress, presentationData, pdfBase64 } = parseResult.data;
+      const id = randomUUID();
+      const objectStorageService = new ObjectStorageService();
+
+      // Get presigned URL for upload
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const pdfPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+      // Upload PDF to object storage
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: pdfBuffer,
+        headers: {
+          'Content-Type': 'application/pdf',
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload PDF to storage');
+      }
+
+      // Save presentation metadata
+      const presentation: SavedPresentation = {
+        id,
+        propertyAddress,
+        createdAt: new Date().toISOString(),
+        pdfPath,
+        presentationData,
+      };
+
+      savedPresentations.set(id, presentation);
+
+      res.json({
+        id,
+        pdfUrl: `/api/presentations/${id}/pdf`,
+        shareUrl: `/share/${id}`,
+      });
+    } catch (error) {
+      console.error("Save presentation error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to save presentation" 
+      });
+    }
+  });
+
+  // Get saved presentation PDF
+  app.get("/api/presentations/:id/pdf", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const presentation = savedPresentations.get(id);
+
+      if (!presentation) {
+        return res.status(404).json({ error: "Presentation not found" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(presentation.pdfPath);
+      
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="OfferIQ-${presentation.propertyAddress.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`,
+      });
+
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Get presentation PDF error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to get presentation PDF" 
+      });
+    }
+  });
+
+  // Get presentation metadata
+  app.get("/api/presentations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const presentation = savedPresentations.get(id);
+
+      if (!presentation) {
+        return res.status(404).json({ error: "Presentation not found" });
+      }
+
+      res.json({
+        id: presentation.id,
+        propertyAddress: presentation.propertyAddress,
+        createdAt: presentation.createdAt,
+        pdfUrl: `/api/presentations/${id}/pdf`,
+        shareUrl: `/share/${id}`,
+      });
+    } catch (error) {
+      console.error("Get presentation error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to get presentation" 
+      });
+    }
+  });
+
+  // List all saved presentations
+  app.get("/api/presentations", async (req, res) => {
+    try {
+      const presentations = Array.from(savedPresentations.values()).map(p => ({
+        id: p.id,
+        propertyAddress: p.propertyAddress,
+        createdAt: p.createdAt,
+        pdfUrl: `/api/presentations/${p.id}/pdf`,
+        shareUrl: `/share/${p.id}`,
+      }));
+
+      res.json(presentations);
+    } catch (error) {
+      console.error("List presentations error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to list presentations" 
       });
     }
   });

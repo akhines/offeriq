@@ -411,3 +411,20 @@ export * from "./models/chat";
 
 export { users, insertUserSchema } from "./models/users";
 export type { InsertUser, User } from "./models/users";
+
+// Saved Presentations schema
+export const savedPresentationSchema = z.object({
+  id: z.string(),
+  propertyAddress: z.string(),
+  createdAt: z.string(),
+  pdfPath: z.string(),
+  presentationData: z.any(),
+});
+
+export type SavedPresentation = z.infer<typeof savedPresentationSchema>;
+
+export const createPresentationSchema = z.object({
+  propertyAddress: z.string(),
+  presentationData: z.any(),
+  pdfBase64: z.string(),
+});
