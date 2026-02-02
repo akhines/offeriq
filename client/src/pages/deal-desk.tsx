@@ -310,6 +310,7 @@ export default function OfferIQ() {
               presentationOutput={presentationOutput}
               offerOutput={offerOutput}
               underwritingOutput={underwritingOutput}
+              propertyAddress={state.property.address}
               onPresentationInputChange={handlePresentationInputChange}
               onPresentationOutputChange={setPresentationOutput}
             />

@@ -108,6 +108,19 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - 6 Human Needs assessments include confirming questions
 - No manipulation tactics, focus on win-win negotiations
 
+### PDF Export & Sharing
+- **Download PDF**: Generate and download presentation plan as PDF locally
+- **Save & Share**: Upload PDF to Replit Object Storage and get a shareable link
+- **Unique Links**: Each saved presentation gets a unique URL (`/api/presentations/:id/pdf`)
+- **Library**: Uses jsPDF for client-side PDF generation
+- **Storage**: PDFs stored in Replit Object Storage with in-memory metadata tracking
+
+**Key Endpoints:**
+- `POST /api/presentations/save` - Save presentation PDF to object storage, returns unique link
+- `GET /api/presentations/:id/pdf` - Serve saved PDF by ID
+- `GET /api/presentations/:id` - Get presentation metadata
+- `GET /api/presentations` - List all saved presentations
+
 ## External Dependencies
 
 ### AI Services

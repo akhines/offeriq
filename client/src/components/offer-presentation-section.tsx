@@ -28,7 +28,11 @@ import {
   ExternalLink,
   Image,
   List,
+  Download,
+  Save,
+  Share2,
 } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { SellerInfo, PresentationInput, PresentationOutput, OfferOutput, UnderwritingOutput, CallNote, CompLink } from "@/types";
@@ -50,6 +54,7 @@ interface OfferPresentationSectionProps {
   presentationOutput: PresentationOutput | null;
   offerOutput: OfferOutput | null;
   underwritingOutput: UnderwritingOutput | null;
+  propertyAddress?: string;
   onPresentationInputChange: (input: PresentationInput) => void;
   onPresentationOutputChange: (output: PresentationOutput) => void;
 }
@@ -83,6 +88,7 @@ export function OfferPresentationSection({
   presentationOutput,
   offerOutput,
   underwritingOutput,
+  propertyAddress,
   onPresentationInputChange,
   onPresentationOutputChange,
 }: OfferPresentationSectionProps) {
@@ -92,6 +98,180 @@ export function OfferPresentationSection({
   const [newCompLinkUrl, setNewCompLinkUrl] = useState("");
   const [newCompLinkLabel, setNewCompLinkLabel] = useState("");
   const [compLinkDisplayMode, setCompLinkDisplayMode] = useState<"list" | "preview">("list");
+  const [savedPdfUrl, setSavedPdfUrl] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const generatePdf = (): jsPDF => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - 2 * margin;
+    let y = 20;
+
+    const addText = (text: string, fontSize: number = 10, isBold: boolean = false) => {
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      const lines = doc.splitTextToSize(text, contentWidth);
+      lines.forEach((line: string) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin, y);
+        y += fontSize * 0.5;
+      });
+      y += 3;
+    };
+
+    const addSection = (title: string, content: string | string[]) => {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      addText(title, 12, true);
+      y += 2;
+      if (Array.isArray(content)) {
+        content.forEach((item) => addText(`• ${item}`, 10));
+      } else {
+        addText(content, 10);
+      }
+      y += 5;
+    };
+
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("OfferIQ Presentation Plan", margin, y);
+    y += 10;
+
+    if (propertyAddress) {
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Property: ${propertyAddress}`, margin, y);
+      y += 8;
+    }
+
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, y);
+    y += 15;
+
+    if (presentationOutput) {
+      if (presentationOutput.sellerSummary) {
+        addSection("Seller Summary", presentationOutput.sellerSummary);
+      }
+
+      if (presentationOutput.motivationHypotheses?.length) {
+        addSection(
+          "Motivation Hypotheses",
+          presentationOutput.motivationHypotheses.map(
+            (h) => `[${h.confidence.toUpperCase()}] ${h.hypothesis}`
+          )
+        );
+      }
+
+      if (presentationOutput.communicationCues?.length) {
+        addSection("Communication Cues (DISC)", presentationOutput.communicationCues);
+      }
+
+      if (presentationOutput.sixNeedsMapping?.length) {
+        addSection(
+          "6 Human Needs Mapping",
+          presentationOutput.sixNeedsMapping.map((m) => `${m.need}: ${m.hypothesis}`)
+        );
+      }
+
+      if (presentationOutput.talkTrackSoft) {
+        addSection("Talk Track - Soft Approach", presentationOutput.talkTrackSoft);
+      }
+
+      if (presentationOutput.talkTrackDirect) {
+        addSection("Talk Track - Direct Approach", presentationOutput.talkTrackDirect);
+      }
+
+      if (presentationOutput.recommendedOfferTier) {
+        const tierLabels: Record<string, string> = {
+          fast_yes: "Fast Yes (+8%)",
+          fair: "Fair (Baseline)",
+          stretch: "Stretch (-8%)",
+        };
+        addSection("Recommended Offer Tier", tierLabels[presentationOutput.recommendedOfferTier] || presentationOutput.recommendedOfferTier);
+      }
+
+      if (presentationOutput.offerPackagingPlan) {
+        addSection("Offer Packaging Plan", presentationOutput.offerPackagingPlan);
+      }
+
+      if (presentationOutput.objectionHandling?.length) {
+        addSection(
+          "Objection Handling",
+          presentationOutput.objectionHandling.map((obj) => {
+            if (typeof obj === 'string') return obj;
+            const objData = obj as unknown as { Objection?: string; Response?: string; objection?: string; response?: string };
+            const objection = objData.Objection || objData.objection || '';
+            const response = objData.Response || objData.response || '';
+            return `Q: "${objection}" -> A: ${response}`;
+          })
+        );
+      }
+
+      if (presentationOutput.nextActions?.length) {
+        addSection("Next Actions", presentationOutput.nextActions);
+      }
+
+      if (presentationOutput.followUpCadence) {
+        addSection("Follow-Up Cadence", presentationOutput.followUpCadence);
+      }
+
+      if (presentationInput.compLinks?.length) {
+        addSection(
+          "Supporting Comp Links",
+          presentationInput.compLinks.map((link) => link.label || link.url)
+        );
+      }
+    }
+
+    return doc;
+  };
+
+  const handleDownloadPdf = () => {
+    if (!presentationOutput) return;
+    const doc = generatePdf();
+    const filename = propertyAddress
+      ? `OfferIQ-${propertyAddress.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`
+      : `OfferIQ-Presentation-${Date.now()}.pdf`;
+    doc.save(filename);
+    toast({ description: "PDF downloaded successfully" });
+  };
+
+  const handleSavePdf = async () => {
+    if (!presentationOutput) return;
+    setIsSaving(true);
+    try {
+      const doc = generatePdf();
+      const pdfBase64 = doc.output("datauristring").split(",")[1];
+
+      const response = await apiRequest("POST", "/api/presentations/save", {
+        propertyAddress: propertyAddress || "Unknown Property",
+        presentationData: presentationOutput,
+        pdfBase64,
+      });
+
+      const result = await response.json();
+      const fullUrl = `${window.location.origin}${result.pdfUrl}`;
+      setSavedPdfUrl(fullUrl);
+
+      await navigator.clipboard.writeText(fullUrl);
+      toast({
+        description: "PDF saved! Link copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        description: error instanceof Error ? error.message : "Failed to save PDF",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -530,6 +710,61 @@ export function OfferPresentationSection({
         {presentationOutput ? (
           <ScrollArea className="h-[calc(100vh-200px)]">
             <div className="space-y-4 pr-4">
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-sm">Presentation Plan Generated</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadPdf}
+                        data-testid="button-download-pdf"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Download PDF
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSavePdf}
+                        disabled={isSaving}
+                        data-testid="button-save-pdf"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-4 w-4 mr-1" />
+                            Save & Share
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {savedPdfUrl && (
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Saved link:</span>
+                      <a
+                        href={savedPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline flex items-center gap-1"
+                      >
+                        {savedPdfUrl.length > 50 ? `${savedPdfUrl.slice(0, 50)}...` : savedPdfUrl}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <CopyButton text={savedPdfUrl} label="Link" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">

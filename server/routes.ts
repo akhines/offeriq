@@ -535,6 +535,18 @@ Generate a JSON response with this structure:
       }
 
       const { propertyAddress, presentationData, pdfBase64 } = parseResult.data;
+
+      // Validate PDF size (max 5MB base64 = ~3.75MB file)
+      const MAX_PDF_SIZE = 5 * 1024 * 1024;
+      if (pdfBase64.length > MAX_PDF_SIZE) {
+        return res.status(400).json({ error: "PDF too large (max 5MB)" });
+      }
+
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/=]+$/.test(pdfBase64)) {
+        return res.status(400).json({ error: "Invalid PDF format" });
+      }
+
       const id = randomUUID();
       const objectStorageService = new ObjectStorageService();
 
