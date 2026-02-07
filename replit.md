@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/deals` - Create saved deal (auth required)
 - `PATCH /api/deals/:id` - Update saved deal (auth required)
 - `DELETE /api/deals/:id` - Delete saved deal (auth required)
+- `PATCH /api/deals/:id/archive` - Toggle archive/restore (auth required)
 - `/api/login` - Replit Auth OIDC login
 - `/api/logout` - Replit Auth OIDC logout
 - `/api/auth/user` - Get current authenticated user
@@ -58,6 +59,7 @@ Preferred communication style: Simple, everyday language.
 ### Key Files
 - `client/src/pages/deal-desk.tsx` - Main OfferIQ page with tabbed 3-engine layout
 - `client/src/pages/saved-deals.tsx` - Saved deals dashboard with CRUD operations
+- `client/src/pages/compare-deals.tsx` - Side-by-side deal comparison page
 - `client/src/types.ts` - Complete type definitions for all engines (includes ComparableSale, CompsData)
 - `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI with comps integration
 - `client/src/components/comps-section.tsx` - Comparable sales display with sortable table and statistics

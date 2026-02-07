@@ -6,7 +6,7 @@ import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 // In-memory store for saved presentations (could be moved to database later)
@@ -652,8 +652,15 @@ Generate a JSON response with this structure:
   app.get("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const status = req.query.status as string | undefined;
+
+      const conditions = [eq(savedDeals.userId, userId)];
+      if (status === "active" || status === "archived") {
+        conditions.push(eq(savedDeals.dealStatus, status));
+      }
+
       const deals = await db.select().from(savedDeals)
-        .where(eq(savedDeals.userId, userId))
+        .where(and(...conditions))
         .orderBy(desc(savedDeals.updatedAt));
       res.json(deals);
     } catch (error) {
@@ -724,6 +731,32 @@ Generate a JSON response with this structure:
     } catch (error) {
       console.error("Update deal error:", error);
       res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+
+  app.patch("/api/deals/:id/archive", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const [existing] = await db.select().from(savedDeals).where(eq(savedDeals.id, id));
+      if (!existing) return res.status(404).json({ error: "Deal not found" });
+      if (existing.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      const newStatus = existing.dealStatus === "archived" ? "active" : "archived";
+      const [deal] = await db.update(savedDeals)
+        .set({
+          dealStatus: newStatus,
+          archivedAt: newStatus === "archived" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(savedDeals.id, id))
+        .returning();
+
+      res.json(deal);
+    } catch (error) {
+      console.error("Archive deal error:", error);
+      res.status(500).json({ error: "Failed to archive deal" });
     }
   });
 

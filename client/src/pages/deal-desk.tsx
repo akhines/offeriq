@@ -102,6 +102,7 @@ export default function OfferIQ() {
   const [manualARV, setManualARV] = useState(0);
   const [manualRepairs, setManualRepairs] = useState(0);
   const [presentationOutput, setPresentationOutput] = useState<PresentationOutput | null>(null);
+  const [presentationPdfUrl, setPresentationPdfUrl] = useState<string | null>(null);
 
   const [userComps, setUserComps] = useState<UserCompsState>(() => {
     if (typeof window !== "undefined") {
@@ -157,6 +158,7 @@ export default function OfferIQ() {
       if (underwritingData.manualRepairs !== undefined) setManualRepairs(underwritingData.manualRepairs);
       if (savedUserComps) setUserComps(savedUserComps);
       if (savedPresentationData) setPresentationOutput(savedPresentationData);
+      if (loadedDeal.presentationPdfUrl) setPresentationPdfUrl(loadedDeal.presentationPdfUrl);
     }
   }, [loadedDeal, currentDealId]);
 
@@ -186,6 +188,10 @@ export default function OfferIQ() {
         dealGrade: offerOutput?.dealGrade || null,
         sellerOffer: offerOutput?.sellerOffer || null,
         arv: underwritingOutput?.arv || null,
+        wholesalePrice: offerOutput?.investorBuyPrice || null,
+        repairEstimate: underwritingOutput?.repairBase || null,
+        confidenceScore: underwritingOutput?.confidenceScore || null,
+        presentationPdfUrl: presentationPdfUrl,
       };
 
       if (currentDealId) {
@@ -279,6 +285,7 @@ export default function OfferIQ() {
     setManualARV(0);
     setManualRepairs(0);
     setPresentationOutput(null);
+    setPresentationPdfUrl(null);
     setUserComps(getDefaultUserComps());
     setCurrentDealId(null);
     localStorage.removeItem(STORAGE_KEY);
@@ -527,6 +534,7 @@ export default function OfferIQ() {
               propertyAddress={state.property.address}
               onPresentationInputChange={handlePresentationInputChange}
               onPresentationOutputChange={setPresentationOutput}
+              onPdfUrlChange={setPresentationPdfUrl}
             />
           </TabsContent>
         </Tabs>

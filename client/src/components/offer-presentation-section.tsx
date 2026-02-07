@@ -57,6 +57,7 @@ interface OfferPresentationSectionProps {
   propertyAddress?: string;
   onPresentationInputChange: (input: PresentationInput) => void;
   onPresentationOutputChange: (output: PresentationOutput) => void;
+  onPdfUrlChange?: (url: string) => void;
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -91,6 +92,7 @@ export function OfferPresentationSection({
   propertyAddress,
   onPresentationInputChange,
   onPresentationOutputChange,
+  onPdfUrlChange,
 }: OfferPresentationSectionProps) {
   const { toast } = useToast();
   const [newNoteDate, setNewNoteDate] = useState(new Date().toISOString().split("T")[0]);
@@ -258,6 +260,7 @@ export function OfferPresentationSection({
       const result = await response.json();
       const fullUrl = `${window.location.origin}${result.pdfUrl}`;
       setSavedPdfUrl(fullUrl);
+      onPdfUrlChange?.(result.pdfUrl);
 
       await navigator.clipboard.writeText(fullUrl);
       toast({
