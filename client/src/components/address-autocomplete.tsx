@@ -51,7 +51,7 @@ export function AddressAutocomplete({
   }, [value]);
 
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
     if (!apiKey) return;
 
     const initPlaces = async () => {
@@ -189,7 +189,7 @@ export function AddressAutocomplete({
     }
   };
 
-  if (!isReady || !import.meta.env.VITE_GOOGLE_PLACES_API_KEY) {
+  if (!isReady || !import.meta.env.VITE_GOOGLE_MAPS_KEY) {
     return (
       <Input
         ref={inputRef}
