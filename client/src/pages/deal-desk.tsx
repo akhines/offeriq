@@ -24,6 +24,7 @@ import {
   Plus,
   LogOut,
   LogIn,
+  Settings,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -484,6 +485,15 @@ export default function OfferIQ() {
                 <span className="text-sm font-medium hidden sm:inline" data-testid="text-user-name">
                   {user.firstName}
                 </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setLocation("/account")}
+                  data-testid="button-account"
+                  aria-label="Account settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

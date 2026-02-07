@@ -217,7 +217,7 @@ export default function SavedDeals() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/app")}
               data-testid="button-back"
               aria-label="Back to deal desk"
             >
@@ -246,7 +246,7 @@ export default function SavedDeals() {
             <Button
               variant="default"
               size="sm"
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/app")}
               data-testid="button-new-deal"
             >
               <Plus className="h-4 w-4" />
@@ -412,7 +412,7 @@ export default function SavedDeals() {
                 <Button
                   variant="default"
                   className="mt-4"
-                  onClick={() => setLocation("/")}
+                  onClick={() => setLocation("/app")}
                   data-testid="button-start-deal"
                 >
                   <Plus className="h-4 w-4" />
@@ -506,7 +506,7 @@ export default function SavedDeals() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setLocation(`/?deal=${deal.id}`)}
+                      onClick={() => setLocation(`/app?deal=${deal.id}`)}
                       data-testid={`button-open-${deal.id}`}
                     >
                       <ExternalLink className="h-4 w-4" />

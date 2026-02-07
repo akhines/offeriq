@@ -1,13 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences, users } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { stripeService } from "./stripeService";
+import { getStripePublishableKey } from "./stripeClient";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -839,6 +841,172 @@ Generate a JSON response with this structure:
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to list presentations" 
       });
+    }
+  });
+
+  // === STRIPE SUBSCRIPTION ROUTES ===
+
+  app.get("/api/stripe/publishable-key", async (_req, res) => {
+    try {
+      const key = await getStripePublishableKey();
+      res.json({ publishableKey: key });
+    } catch (error) {
+      console.error("Get publishable key error:", error);
+      res.status(500).json({ error: "Failed to get Stripe key" });
+    }
+  });
+
+  app.get("/api/stripe/products", async (_req, res) => {
+    try {
+      const rows = await stripeService.listProductsWithPrices();
+      const productsMap = new Map<string, any>();
+      for (const row of rows as any[]) {
+        if (!productsMap.has(row.product_id)) {
+          const metadata = typeof row.product_metadata === 'string' 
+            ? JSON.parse(row.product_metadata) 
+            : row.product_metadata || {};
+          productsMap.set(row.product_id, {
+            id: row.product_id,
+            name: row.product_name,
+            description: row.product_description,
+            metadata,
+            prices: [],
+          });
+        }
+        if (row.price_id) {
+          const recurring = typeof row.recurring === 'string' 
+            ? JSON.parse(row.recurring) 
+            : row.recurring;
+          productsMap.get(row.product_id).prices.push({
+            id: row.price_id,
+            unitAmount: row.unit_amount,
+            currency: row.currency,
+            recurring,
+          });
+        }
+      }
+      res.json({ products: Array.from(productsMap.values()) });
+    } catch (error) {
+      console.error("List products error:", error);
+      res.status(500).json({ error: "Failed to list products" });
+    }
+  });
+
+  app.get("/api/stripe/subscription", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (!user.stripeSubscriptionId) {
+        return res.json({ subscription: null, tier: user.subscriptionTier || "free" });
+      }
+
+      const subscription = await stripeService.getSubscription(user.stripeSubscriptionId);
+      res.json({ subscription, tier: user.subscriptionTier || "free" });
+    } catch (error) {
+      console.error("Get subscription error:", error);
+      res.status(500).json({ error: "Failed to get subscription" });
+    }
+  });
+
+  app.post("/api/stripe/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { priceId } = req.body;
+
+      if (!priceId) return res.status(400).json({ error: "priceId is required" });
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripeService.createCustomer(user.email || "", userId);
+        await db.update(users).set({ stripeCustomerId: customer.id }).where(eq(users.id, userId));
+        customerId = customer.id;
+      }
+
+      const session = await stripeService.createCheckoutSession(
+        customerId,
+        priceId,
+        `${req.protocol}://${req.get('host')}/checkout/success`,
+        `${req.protocol}://${req.get('host')}/pricing`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Create checkout error:", error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/stripe/portal", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user?.stripeCustomerId) {
+        return res.status(400).json({ error: "No billing account found" });
+      }
+
+      const session = await stripeService.createCustomerPortalSession(
+        user.stripeCustomerId,
+        `${req.protocol}://${req.get('host')}/account`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Create portal session error:", error);
+      res.status(500).json({ error: "Failed to create portal session" });
+    }
+  });
+
+  app.post("/api/stripe/sync-subscription", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user?.stripeCustomerId) {
+        return res.json({ tier: "free", subscription: null });
+      }
+
+      const subscription = await stripeService.getSubscriptionByCustomerId(user.stripeCustomerId);
+      
+      if (subscription) {
+        const subAny = subscription as any;
+        const productResult = await db.execute(
+          sql`SELECT p.metadata FROM stripe.products p 
+              JOIN stripe.prices pr ON pr.product = p.id 
+              JOIN stripe.subscriptions s ON s.id = ${subAny.id}
+              WHERE pr.id = (
+                SELECT price FROM stripe.subscription_items WHERE subscription = ${subAny.id} LIMIT 1
+              )
+              LIMIT 1`
+        );
+        
+        let tier = "basic";
+        if (productResult.rows.length > 0) {
+          const metadata = typeof (productResult.rows[0] as any).metadata === 'string' 
+            ? JSON.parse((productResult.rows[0] as any).metadata) 
+            : (productResult.rows[0] as any).metadata || {};
+          tier = metadata.tier || "basic";
+        }
+
+        await db.update(users).set({
+          stripeSubscriptionId: subAny.id,
+          subscriptionTier: tier,
+        }).where(eq(users.id, userId));
+
+        res.json({ tier, subscription });
+      } else {
+        await db.update(users).set({
+          stripeSubscriptionId: null,
+          subscriptionTier: "free",
+        }).where(eq(users.id, userId));
+        res.json({ tier: "free", subscription: null });
+      }
+    } catch (error) {
+      console.error("Sync subscription error:", error);
+      res.status(500).json({ error: "Failed to sync subscription" });
     }
   });
 

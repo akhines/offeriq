@@ -212,7 +212,7 @@ export default function CompareDeals() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setLocation(`/?deal=${deal.id}`)}
+                        onClick={() => setLocation(`/app?deal=${deal.id}`)}
                         data-testid={`button-open-compare-${deal.id}`}
                       >
                         <ExternalLink className="h-3 w-3" />
