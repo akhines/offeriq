@@ -570,11 +570,15 @@ export default function OfferIQ() {
           <TabsContent value="presentation" className="mt-6">
             <OfferPresentationSection
               seller={state.seller}
+              property={state.property}
               presentationInput={state.presentationInput}
               presentationOutput={presentationOutput}
               offerOutput={offerOutput}
               underwritingOutput={underwritingOutput}
+              offerSettings={state.offerSettings}
               propertyAddress={state.property.address}
+              manualARV={manualARV}
+              manualRepairs={manualRepairs}
               onPresentationInputChange={handlePresentationInputChange}
               onPresentationOutputChange={setPresentationOutput}
               onPdfUrlChange={setPresentationPdfUrl}
