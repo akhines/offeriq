@@ -254,7 +254,7 @@ export function OfferPresentationSection({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                 <div className="col-span-1">
                   <Label htmlFor="noteDate">Date</Label>
                   <Input

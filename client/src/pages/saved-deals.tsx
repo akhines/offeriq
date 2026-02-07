@@ -212,7 +212,7 @@ export default function SavedDeals() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -256,7 +256,7 @@ export default function SavedDeals() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-6 space-y-6">
         {stats && statusTab === "active" && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="stats-grid">
             <Card>
@@ -326,7 +326,7 @@ export default function SavedDeals() {
           </div>
 
           <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
-            <SelectTrigger className="w-[180px]" data-testid="select-sort">
+            <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sort">
               <ArrowUpDown className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>

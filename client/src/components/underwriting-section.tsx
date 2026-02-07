@@ -265,7 +265,7 @@ export function UnderwritingSection({
                   ) : (
                     <Search className="h-4 w-4" />
                   )}
-                  <span className="ml-2">{isLoadingValuation ? "Loading..." : "Fetch Data"}</span>
+                  <span className="ml-2 hidden sm:inline">{isLoadingValuation ? "Loading..." : "Fetch Data"}</span>
                 </Button>
               </div>
               {zillowLink && (
@@ -303,7 +303,7 @@ export function UnderwritingSection({
               </Select>
             </div>
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <Label htmlFor="beds">Beds</Label>
                 <Input
@@ -741,7 +741,7 @@ export function UnderwritingSection({
                     <TrendingUp className="h-4 w-4" />
                     As-Is Value Range
                   </h4>
-                  <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-center">
                     <div className="p-3 rounded-md bg-muted">
                       <p className="text-xs text-muted-foreground">Low</p>
                       <p className="font-mono text-lg font-semibold">{formatCurrency(underwritingOutput.asIsLow)}</p>
@@ -764,7 +764,7 @@ export function UnderwritingSection({
                     <AlertTriangle className="h-4 w-4" />
                     Repair Estimate
                   </h4>
-                  <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-center">
                     <div className="p-3 rounded-md bg-muted">
                       <p className="text-xs text-muted-foreground">Low</p>
                       <p className="font-mono text-lg font-semibold">{formatCurrency(underwritingOutput.repairLow)}</p>

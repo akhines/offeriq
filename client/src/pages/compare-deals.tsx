@@ -78,7 +78,7 @@ function CompareRow({ label, values, format = "text", icon, highlight = "none" }
   }
 
   return (
-    <div className="grid items-center gap-4 py-2" style={{ gridTemplateColumns: `200px repeat(${values.length}, 1fr)` }}>
+    <div className="grid items-center gap-4 py-2" style={{ gridTemplateColumns: `140px repeat(${values.length}, 1fr)` }}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         {icon}
         {label}
@@ -145,7 +145,7 @@ export default function CompareDeals() {
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center gap-3">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/deals")} data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -153,7 +153,7 @@ export default function CompareDeals() {
             <h1 className="text-xl font-bold">Compare Deals</h1>
           </div>
         </header>
-        <main className="max-w-7xl mx-auto px-6 py-12 text-center">
+        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-12 text-center">
           <p className="text-muted-foreground">Select at least 2 deals from the dashboard to compare.</p>
           <Button className="mt-4" onClick={() => setLocation("/deals")} data-testid="button-go-back">
             Go to My Deals
@@ -166,7 +166,7 @@ export default function CompareDeals() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/deals")} data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
@@ -178,7 +178,7 @@ export default function CompareDeals() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-6">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-12 w-full" />
@@ -191,11 +191,11 @@ export default function CompareDeals() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card className="overflow-x-auto">
             <CardHeader className="pb-2">
               <div
                 className="grid items-center gap-4"
-                style={{ gridTemplateColumns: `200px repeat(${deals.length}, 1fr)` }}
+                style={{ gridTemplateColumns: `140px repeat(${deals.length}, 1fr)` }}
               >
                 <div />
                 {deals.map((deal) => (

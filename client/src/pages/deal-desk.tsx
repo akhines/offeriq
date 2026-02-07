@@ -431,11 +431,11 @@ export default function OfferIQ() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-14 py-2 sm:py-0 sm:h-16 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <FileText className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-bold">OfferIQ</h1>
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs hidden sm:inline-flex">
               3-Engine Underwriter
             </Badge>
           </div>
@@ -519,7 +519,7 @@ export default function OfferIQ() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <Tabs defaultValue="underwriting" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
             <TabsTrigger value="underwriting" className="gap-2" data-testid="tab-underwriting">
@@ -588,9 +588,9 @@ export default function OfferIQ() {
       </main>
 
       <footer className="border-t mt-12">
-        <div className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-between text-sm text-muted-foreground">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-12 flex items-center justify-between text-sm text-muted-foreground">
           <span>OfferIQ - 3-Engine Real Estate Underwriter</span>
-          <span>Data auto-saves locally</span>
+          <span className="hidden sm:inline">Data auto-saves locally</span>
         </div>
       </footer>
     </div>
