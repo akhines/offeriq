@@ -46,14 +46,17 @@ Preferred communication style: Simple, everyday language.
 - `PATCH /api/deals/:id` - Update saved deal (auth required)
 - `DELETE /api/deals/:id` - Delete saved deal (auth required)
 - `PATCH /api/deals/:id/archive` - Toggle archive/restore (auth required)
+- `GET /api/preferences` - Get user preferences/working state (auth required)
+- `PUT /api/preferences` - Save user preferences/working state (auth required)
 - `/api/login` - Replit Auth OIDC login
 - `/api/logout` - Replit Auth OIDC logout
 - `/api/auth/user` - Get current authenticated user
 
 ### Data Storage
-- **Client Persistence**: localStorage for all deal inputs, settings, and AI results (fallback)
-- **Database**: PostgreSQL with Drizzle ORM for users, sessions, and saved deals
-- **Schema Location**: `shared/schema.ts` re-exports from `shared/models/auth.ts` and `shared/models/savedDeals.ts`
+- **Client Persistence**: localStorage for all deal inputs, settings, and AI results (fast fallback for guests)
+- **Server Persistence**: PostgreSQL with Drizzle ORM for users, sessions, saved deals, saved presentations, and user preferences
+- **Auto-save**: Logged-in users get debounced (3s) auto-save of working deal state to `user_preferences` table; loads from server on return
+- **Schema Location**: `shared/schema.ts` re-exports from `shared/models/auth.ts`, `shared/models/savedDeals.ts`, `shared/models/savedPresentations.ts`, `shared/models/userPreferences.ts`
 - **Auth**: Replit Auth (OIDC) with passport, sessions stored in PostgreSQL
 
 ### Key Files
@@ -62,7 +65,8 @@ Preferred communication style: Simple, everyday language.
 - `client/src/pages/compare-deals.tsx` - Side-by-side deal comparison page
 - `client/src/types.ts` - Complete type definitions for all engines (includes ComparableSale, CompsData)
 - `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI with comps integration
-- `client/src/components/comps-section.tsx` - Comparable sales display with sortable table and statistics
+- `client/src/components/comps-section.tsx` - Comparable sales display with sortable table, filters, and map toggle
+- `client/src/components/comps-map.tsx` - Google Maps view showing comp locations relative to subject property
 - `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder
 - `client/src/components/offer-presentation-section.tsx` - AI presentation generator
 
@@ -105,9 +109,14 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 ### Comparable Sales Analysis
 - Auto-fetched when property data is loaded
 - Uses RentCast AVM endpoint's `comparables` array (up to 15 comps)
-- Statistics: Avg $/Sqft, Median Price, Avg Price, Suggested ARV
-- Sortable table by price, sqft, $/sqft, distance, sold date
+- Includes lat/lng coordinates, correlation scores from RentCast API
+- Statistics: Avg $/Sqft, Median Price, Avg Price, Suggested ARV (recalculated when filters active)
+- Sortable table by price, sqft, $/sqft, distance, sold date, correlation
 - "Use Suggested ARV" button auto-populates Manual ARV field
+- **Map View**: Google Maps showing subject property (blue pin) and comp locations (green pins) with info windows
+- **Filters**: Distance slider (0.25-5mi), date range slider (1-24 months), property type dropdown
+- **Photo Thumbnails**: Google Street View images for each comp in table view
+- Toggle between table view and map view
 
 ### User-Submitted Comps
 - Users can add their own comparable sales manually (address, price, sqft, beds/baths, sold date)
@@ -127,7 +136,7 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - **Save & Share**: Upload PDF to Replit Object Storage and get a shareable link
 - **Unique Links**: Each saved presentation gets a unique URL (`/api/presentations/:id/pdf`)
 - **Library**: Uses jsPDF for client-side PDF generation
-- **Storage**: PDFs stored in Replit Object Storage with in-memory metadata tracking
+- **Storage**: PDFs stored in Replit Object Storage with metadata in PostgreSQL `saved_presentations` table
 
 **Key Endpoints:**
 - `POST /api/presentations/save` - Save presentation PDF to object storage, returns unique link
@@ -146,6 +155,7 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - `drizzle-orm` / `drizzle-zod`: Database ORM and schema validation
 - `zod`: Runtime type validation
 - `wouter`: Client routing
+- `@react-google-maps/api`: Google Maps integration for comp map view
 - Radix UI primitives: Accessible component foundations
 - `framer-motion`: Animations
 

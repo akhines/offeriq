@@ -281,6 +281,10 @@ export interface ComparableSale {
   distanceMiles: number;
   daysOnMarket?: number;
   propertyType?: string;
+  latitude?: number;
+  longitude?: number;
+  correlation?: number;
+  photoUrl?: string;
 }
 
 export interface CompsData {
@@ -293,6 +297,8 @@ export interface CompsData {
     bathrooms?: number;
     yearBuilt?: number;
     lotSize?: number;
+    latitude?: number;
+    longitude?: number;
   };
   avgPricePerSqft: number;
   medianPrice: number;
@@ -410,17 +416,8 @@ export interface NegotiationPlan {
 export * from "./models/chat";
 export * from "./models/auth";
 export * from "./models/savedDeals";
-
-// Saved Presentations schema
-export const savedPresentationSchema = z.object({
-  id: z.string(),
-  propertyAddress: z.string(),
-  createdAt: z.string(),
-  pdfPath: z.string(),
-  presentationData: z.any(),
-});
-
-export type SavedPresentation = z.infer<typeof savedPresentationSchema>;
+export * from "./models/savedPresentations";
+export * from "./models/userPreferences";
 
 export const createPresentationSchema = z.object({
   propertyAddress: z.string(),

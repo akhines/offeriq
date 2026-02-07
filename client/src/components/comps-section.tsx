@@ -1,25 +1,41 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { 
-  ArrowUpDown, 
-  MapPin, 
-  TrendingUp, 
-  Home, 
+import {
+  ArrowUpDown,
+  MapPin,
+  TrendingUp,
+  Home,
   Calendar,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Filter,
+  Map,
+  List,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
+import { CompsMap } from "@/components/comps-map";
 import type { CompsData, ComparableSale } from "@/types";
 
 interface CompsSectionProps {
@@ -29,8 +45,9 @@ interface CompsSectionProps {
   onUseSuggestedARV?: (arv: number) => void;
 }
 
-type SortField = "price" | "pricePerSqft" | "sqft" | "distanceMiles" | "soldDate";
+type SortField = "price" | "pricePerSqft" | "sqft" | "distanceMiles" | "soldDate" | "correlation";
 type SortDirection = "asc" | "desc";
+type ViewMode = "table" | "map";
 
 function formatCurrency(value: number): string {
   if (!value) return "$0";
@@ -59,15 +76,35 @@ function getDaysAgo(dateString: string): number | null {
   }
 }
 
-export function CompsSection({ 
-  compsData, 
-  isLoading, 
+function getStreetViewUrl(address: string): string {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
+  if (!apiKey) return "";
+  return `https://maps.googleapis.com/maps/api/streetview?size=120x80&location=${encodeURIComponent(address)}&key=${apiKey}`;
+}
+
+const PROPERTY_TYPES = [
+  { value: "all", label: "All Types" },
+  { value: "single family", label: "Single Family" },
+  { value: "condo", label: "Condo" },
+  { value: "townhouse", label: "Townhouse" },
+  { value: "multi family", label: "Multi Family" },
+];
+
+export function CompsSection({
+  compsData,
+  isLoading,
   subjectSqft,
-  onUseSuggestedARV 
+  onUseSuggestedARV,
 }: CompsSectionProps) {
   const [sortField, setSortField] = useState<SortField>("distanceMiles");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showAllComps, setShowAllComps] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [maxDistance, setMaxDistance] = useState(5);
+  const [dateRangeMonths, setDateRangeMonths] = useState(24);
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
 
   if (isLoading) {
     return (
@@ -116,38 +153,83 @@ export function CompsSection({
     }
   };
 
-  const sortedComps = [...compsData.comps].sort((a, b) => {
-    let aVal: number | string = a[sortField];
-    let bVal: number | string = b[sortField];
-    
-    if (sortField === "soldDate") {
-      aVal = new Date(a.soldDate).getTime() || 0;
-      bVal = new Date(b.soldDate).getTime() || 0;
+  const filteredComps = useMemo(() => {
+    let result = [...compsData.comps];
+
+    if (maxDistance < 5) {
+      result = result.filter(c => c.distanceMiles <= maxDistance);
     }
-    
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+    if (dateRangeMonths < 24) {
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - dateRangeMonths);
+      result = result.filter(c => {
+        if (!c.soldDate || c.soldDate === "Unknown") return true;
+        try {
+          return new Date(c.soldDate) >= cutoffDate;
+        } catch {
+          return true;
+        }
+      });
     }
-    return 0;
-  });
+
+    if (propertyTypeFilter !== "all") {
+      result = result.filter(c => {
+        if (!c.propertyType) return false;
+        const compType = c.propertyType.toLowerCase().replace(/_/g, " ");
+        return compType.includes(propertyTypeFilter);
+      });
+    }
+
+    return result;
+  }, [compsData.comps, maxDistance, dateRangeMonths, propertyTypeFilter]);
+
+  const sortedComps = useMemo(() => {
+    return [...filteredComps].sort((a, b) => {
+      let aVal: number | string = (a as any)[sortField] ?? 0;
+      let bVal: number | string = (b as any)[sortField] ?? 0;
+
+      if (sortField === "soldDate") {
+        aVal = new Date(a.soldDate).getTime() || 0;
+        bVal = new Date(b.soldDate).getTime() || 0;
+      }
+
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      return 0;
+    });
+  }, [filteredComps, sortField, sortDirection]);
 
   const displayedComps = showAllComps ? sortedComps : sortedComps.slice(0, 5);
 
-  const priceRange = {
-    min: Math.min(...compsData.comps.map(c => c.price)),
-    max: Math.max(...compsData.comps.map(c => c.price)),
-  };
+  const filteredStats = useMemo(() => {
+    const prices = filteredComps.map(c => c.price);
+    const pricesPerSqft = filteredComps.map(c => c.pricePerSqft);
+    return {
+      avgPricePerSqft: pricesPerSqft.length > 0
+        ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length)
+        : 0,
+      medianPrice: prices.length > 0
+        ? [...prices].sort((a, b) => a - b)[Math.floor(prices.length / 2)]
+        : 0,
+      avgPrice: prices.length > 0
+        ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+        : 0,
+      priceRange: {
+        min: prices.length > 0 ? Math.min(...prices) : 0,
+        max: prices.length > 0 ? Math.max(...prices) : 0,
+      },
+      sqftRange: {
+        min: filteredComps.length > 0 ? Math.min(...filteredComps.map(c => c.sqft)) : 0,
+        max: filteredComps.length > 0 ? Math.max(...filteredComps.map(c => c.sqft)) : 0,
+      },
+    };
+  }, [filteredComps]);
 
-  const sqftRange = {
-    min: Math.min(...compsData.comps.map(c => c.sqft)),
-    max: Math.max(...compsData.comps.map(c => c.sqft)),
-  };
-
-  const avgPrice = Math.round(compsData.comps.reduce((sum, c) => sum + c.price, 0) / compsData.comps.length);
-
-  const estimatedValueFromComps = subjectSqft && compsData.avgPricePerSqft 
-    ? subjectSqft * compsData.avgPricePerSqft 
-    : compsData.suggestedARV;
+  const hasActiveFilters = maxDistance < 5 || dateRangeMonths < 24 || propertyTypeFilter !== "all";
+  const hasMapData = compsData.comps.some(c => c.latitude && c.longitude) ||
+    (compsData.subjectProperty?.latitude && compsData.subjectProperty?.longitude);
 
   const SortButton = ({ field, children, testId }: { field: SortField; children: React.ReactNode; testId: string }) => (
     <span
@@ -160,153 +242,299 @@ export function CompsSection({
     </span>
   );
 
+  const streetViewAvailable = !!import.meta.env.VITE_GOOGLE_MAPS_KEY;
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Home className="h-5 w-5" />
-            Comparable Sales
-            <Badge variant="secondary" data-testid="badge-comp-count">{compsData.comps.length} comps</Badge>
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="p-3 rounded-lg bg-muted">
-            <div className="text-xs text-muted-foreground mb-1">Avg $/Sqft</div>
-            <div className="text-lg font-bold font-mono">${compsData.avgPricePerSqft}</div>
-          </div>
-          <div className="p-3 rounded-lg bg-muted">
-            <div className="text-xs text-muted-foreground mb-1">Median Price</div>
-            <div className="text-lg font-bold font-mono">{formatCurrency(compsData.medianPrice)}</div>
-          </div>
-          <div className="p-3 rounded-lg bg-muted">
-            <div className="text-xs text-muted-foreground mb-1">Avg Price</div>
-            <div className="text-lg font-bold font-mono">{formatCurrency(avgPrice)}</div>
-          </div>
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              Suggested ARV
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Home className="h-5 w-5" />
+              Comparable Sales
+              <Badge variant="secondary" data-testid="badge-comp-count">
+                {filteredComps.length}{filteredComps.length !== compsData.comps.length ? ` / ${compsData.comps.length}` : ""} comps
+              </Badge>
+            </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`toggle-elevate ${showFilters ? "toggle-elevated" : ""}`}
+                data-testid="button-toggle-filters"
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+              {hasMapData && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setViewMode("table")}
+                    className={`toggle-elevate ${viewMode === "table" ? "toggle-elevated" : ""}`}
+                    data-testid="button-view-table"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setViewMode("map")}
+                    className={`toggle-elevate ${viewMode === "map" ? "toggle-elevated" : ""}`}
+                    data-testid="button-view-map"
+                  >
+                    <Map className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
-            <div className="text-lg font-bold font-mono text-primary">{formatCurrency(compsData.suggestedARV)}</div>
           </div>
-        </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {showFilters && (
+            <div className="p-4 rounded-lg bg-muted space-y-4" data-testid="filters-panel">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">Filters</span>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setMaxDistance(5);
+                      setDateRangeMonths(24);
+                      setPropertyTypeFilter("all");
+                    }}
+                    data-testid="button-clear-filters"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Max Distance: {maxDistance} mi</Label>
+                  <Slider
+                    value={[maxDistance]}
+                    onValueChange={([v]) => setMaxDistance(v)}
+                    min={0.25}
+                    max={5}
+                    step={0.25}
+                    data-testid="slider-distance"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Sold Within: {dateRangeMonths} months</Label>
+                  <Slider
+                    value={[dateRangeMonths]}
+                    onValueChange={([v]) => setDateRangeMonths(v)}
+                    min={1}
+                    max={24}
+                    step={1}
+                    data-testid="slider-date-range"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Property Type</Label>
+                  <Select value={propertyTypeFilter} onValueChange={setPropertyTypeFilter}>
+                    <SelectTrigger data-testid="select-property-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROPERTY_TYPES.map(pt => (
+                        <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {onUseSuggestedARV && compsData.suggestedARV > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onUseSuggestedARV(compsData.suggestedARV)}
-            className="w-full"
-            data-testid="button-use-suggested-arv"
-          >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Use Suggested ARV ({formatCurrency(compsData.suggestedARV)})
-          </Button>
-        )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg bg-muted">
+              <div className="text-xs text-muted-foreground mb-1">Avg $/Sqft</div>
+              <div className="text-lg font-bold font-mono">${filteredStats.avgPricePerSqft}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-muted">
+              <div className="text-xs text-muted-foreground mb-1">Median Price</div>
+              <div className="text-lg font-bold font-mono">{formatCurrency(filteredStats.medianPrice)}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-muted">
+              <div className="text-xs text-muted-foreground mb-1">Avg Price</div>
+              <div className="text-lg font-bold font-mono">{formatCurrency(filteredStats.avgPrice)}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Suggested ARV
+              </div>
+              <div className="text-lg font-bold font-mono text-primary">{formatCurrency(compsData.suggestedARV)}</div>
+            </div>
+          </div>
 
-        <Separator />
+          {onUseSuggestedARV && compsData.suggestedARV > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onUseSuggestedARV(compsData.suggestedARV)}
+              className="w-full"
+              data-testid="button-use-suggested-arv"
+            >
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Use Suggested ARV ({formatCurrency(compsData.suggestedARV)})
+            </Button>
+          )}
 
-        <div className="text-xs text-muted-foreground flex flex-wrap gap-4">
-          <span>Price Range: {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}</span>
-          <span>Sqft Range: {sqftRange.min.toLocaleString()} - {sqftRange.max.toLocaleString()}</span>
-        </div>
+          <Separator />
 
-        <div className="rounded-md border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[200px]">Address</TableHead>
-                <TableHead className="text-right">
-                  <SortButton field="price" testId="sort-price">Price</SortButton>
-                </TableHead>
-                <TableHead className="text-right">
-                  <SortButton field="sqft" testId="sort-sqft">Sqft</SortButton>
-                </TableHead>
-                <TableHead className="text-right">
-                  <SortButton field="pricePerSqft" testId="sort-price-sqft">$/Sqft</SortButton>
-                </TableHead>
-                <TableHead className="text-center">Bed/Bath</TableHead>
-                <TableHead className="text-right">
-                  <SortButton field="distanceMiles" testId="sort-distance">Distance</SortButton>
-                </TableHead>
-                <TableHead className="text-right">
-                  <SortButton field="soldDate" testId="sort-sold">Sold</SortButton>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedComps.map((comp, index) => {
-                const daysAgo = getDaysAgo(comp.soldDate);
-                return (
-                  <TableRow key={index} data-testid={`row-comp-${index}`}>
-                    <TableCell className="font-medium">
-                      <div className="truncate max-w-[200px]" title={comp.address}>
-                        {comp.address}
-                      </div>
-                      {comp.propertyType && (
-                        <div className="text-xs text-muted-foreground">{comp.propertyType}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(comp.price)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {comp.sqft.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${comp.pricePerSqft}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {comp.bedrooms}/{comp.bathrooms}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {comp.distanceMiles.toFixed(2)} mi
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="text-xs">{formatDate(comp.soldDate)}</span>
-                        {daysAgo !== null && (
-                          <span className="text-xs text-muted-foreground">{daysAgo}d ago</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+          <div className="text-xs text-muted-foreground flex flex-wrap gap-4">
+            <span>Price Range: {formatCurrency(filteredStats.priceRange.min)} - {formatCurrency(filteredStats.priceRange.max)}</span>
+            <span>Sqft Range: {filteredStats.sqftRange.min.toLocaleString()} - {filteredStats.sqftRange.max.toLocaleString()}</span>
+          </div>
 
-        {compsData.comps.length > 5 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAllComps(!showAllComps)}
-            className="w-full"
-            data-testid="button-toggle-all-comps"
-          >
-            {showAllComps ? (
-              <>
-                <ChevronUp className="h-4 w-4 mr-1" />
-                Show Less
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4 mr-1" />
-                Show All {compsData.comps.length} Comps
-              </>
-            )}
-          </Button>
-        )}
+          {viewMode === "map" && hasMapData ? (
+            <CompsMap compsData={compsData} filteredComps={filteredComps} />
+          ) : (
+            <>
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {streetViewAvailable && <TableHead className="w-[70px]">Photo</TableHead>}
+                      <TableHead className="w-[180px]">Address</TableHead>
+                      <TableHead className="text-right">
+                        <SortButton field="price" testId="sort-price">Price</SortButton>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortButton field="sqft" testId="sort-sqft">Sqft</SortButton>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortButton field="pricePerSqft" testId="sort-price-sqft">$/Sqft</SortButton>
+                      </TableHead>
+                      <TableHead className="text-center">Bed/Bath</TableHead>
+                      <TableHead className="text-right">
+                        <SortButton field="distanceMiles" testId="sort-distance">Dist</SortButton>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortButton field="soldDate" testId="sort-sold">Sold</SortButton>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {displayedComps.map((comp, index) => {
+                      const daysAgo = getDaysAgo(comp.soldDate);
+                      const streetViewSrc = streetViewAvailable ? getStreetViewUrl(comp.address) : "";
+                      return (
+                        <TableRow key={index} data-testid={`row-comp-${index}`}>
+                          {streetViewAvailable && (
+                            <TableCell className="p-1">
+                              <div className="w-[60px] h-[40px] rounded overflow-hidden bg-muted flex items-center justify-center">
+                                <img
+                                  src={comp.photoUrl || streetViewSrc}
+                                  alt={`${comp.photoUrl ? "Listing photo" : "Street view"} of ${comp.address}`}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    const img = e.target as HTMLImageElement;
+                                    if (comp.photoUrl && streetViewSrc && img.src !== streetViewSrc) {
+                                      img.src = streetViewSrc;
+                                    } else {
+                                      img.style.display = "none";
+                                      img.nextElementSibling?.classList.remove("hidden");
+                                    }
+                                  }}
+                                  data-testid={`img-comp-photo-${index}`}
+                                />
+                                <ImageIcon className="h-4 w-4 text-muted-foreground hidden" />
+                              </div>
+                            </TableCell>
+                          )}
+                          <TableCell className="font-medium">
+                            <div className="truncate max-w-[180px]" title={comp.address}>
+                              {comp.address}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {comp.propertyType && (
+                                <span className="text-xs text-muted-foreground">{comp.propertyType}</span>
+                              )}
+                              {comp.correlation !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                  {Math.round(comp.correlation * 100)}% match
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(comp.price)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {comp.sqft.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${comp.pricePerSqft}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {comp.bedrooms}/{comp.bathrooms}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {comp.distanceMiles.toFixed(2)} mi
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs">{formatDate(comp.soldDate)}</span>
+                              {daysAgo !== null && (
+                                <span className="text-xs text-muted-foreground">{daysAgo}d ago</span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {displayedComps.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={streetViewAvailable ? 8 : 7} className="text-center py-6 text-muted-foreground">
+                          No comps match current filters. Try widening your criteria.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
-        <p className="text-xs text-muted-foreground text-center">
-          <Calendar className="h-3 w-3 inline mr-1" />
-          Comps from last 180 days within 1 mile radius
-        </p>
-      </CardContent>
-    </Card>
+              {sortedComps.length > 5 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllComps(!showAllComps)}
+                  className="w-full"
+                  data-testid="button-toggle-all-comps"
+                >
+                  {showAllComps ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      Show All {sortedComps.length} Comps
+                    </>
+                  )}
+                </Button>
+              )}
+            </>
+          )}
+
+          <p className="text-xs text-muted-foreground text-center">
+            <Calendar className="h-3 w-3 inline mr-1" />
+            {hasActiveFilters
+              ? `Filtered: ${filteredComps.length} of ${compsData.comps.length} comps shown`
+              : `${compsData.comps.length} comps loaded`}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -195,6 +195,10 @@ export interface ComparableSale {
   distanceMiles: number;
   daysOnMarket?: number;
   propertyType?: string;
+  latitude?: number;
+  longitude?: number;
+  correlation?: number;
+  photoUrl?: string;
 }
 
 export interface CompsData {
@@ -207,6 +211,8 @@ export interface CompsData {
     bathrooms?: number;
     yearBuilt?: number;
     lotSize?: number;
+    latitude?: number;
+    longitude?: number;
   };
   avgPricePerSqft: number;
   medianPrice: number;

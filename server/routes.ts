@@ -1,16 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, type SavedPresentation, savedDeals, insertSavedDealSchema } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
-
-// In-memory store for saved presentations (could be moved to database later)
-const savedPresentations: Map<string, SavedPresentation> = new Map();
 
 export async function registerRoutes(
   httpServer: Server,
@@ -452,7 +449,10 @@ Generate a JSON response with this structure:
         soldDate: comp.lastSaleDate || comp.saleDate || "Unknown",
         distanceMiles: comp.distance || 0,
         daysOnMarket: comp.daysOnMarket,
-        propertyType: comp.propertyType
+        propertyType: comp.propertyType,
+        latitude: comp.latitude || undefined,
+        longitude: comp.longitude || undefined,
+        correlation: comp.correlation || undefined,
       }));
 
       // Filter by property type if specified
@@ -509,7 +509,9 @@ Generate a JSON response with this structure:
           bedrooms: data.subjectProperty.bedrooms,
           bathrooms: data.subjectProperty.bathrooms,
           yearBuilt: data.subjectProperty.yearBuilt,
-          lotSize: data.subjectProperty.lotSize
+          lotSize: data.subjectProperty.lotSize,
+          latitude: data.subjectProperty.latitude || data.latitude,
+          longitude: data.subjectProperty.longitude || data.longitude,
         } : undefined,
         avgPricePerSqft,
         medianPrice,
@@ -571,21 +573,20 @@ Generate a JSON response with this structure:
         throw new Error('Failed to upload PDF to storage');
       }
 
-      // Save presentation metadata
-      const presentation: SavedPresentation = {
+      const userId = (req as any).user?.claims?.sub || null;
+
+      const [presentation] = await db.insert(savedPresentations).values({
         id,
+        userId,
         propertyAddress,
-        createdAt: new Date().toISOString(),
         pdfPath,
         presentationData,
-      };
-
-      savedPresentations.set(id, presentation);
+      }).returning();
 
       res.json({
-        id,
-        pdfUrl: `/api/presentations/${id}/pdf`,
-        shareUrl: `/share/${id}`,
+        id: presentation.id,
+        pdfUrl: `/api/presentations/${presentation.id}/pdf`,
+        shareUrl: `/share/${presentation.id}`,
       });
     } catch (error) {
       console.error("Save presentation error:", error);
@@ -595,11 +596,10 @@ Generate a JSON response with this structure:
     }
   });
 
-  // Get saved presentation PDF
   app.get("/api/presentations/:id/pdf", async (req, res) => {
     try {
       const { id } = req.params;
-      const presentation = savedPresentations.get(id);
+      const [presentation] = await db.select().from(savedPresentations).where(eq(savedPresentations.id, id));
 
       if (!presentation) {
         return res.status(404).json({ error: "Presentation not found" });
@@ -622,11 +622,10 @@ Generate a JSON response with this structure:
     }
   });
 
-  // Get presentation metadata
   app.get("/api/presentations/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const presentation = savedPresentations.get(id);
+      const [presentation] = await db.select().from(savedPresentations).where(eq(savedPresentations.id, id));
 
       if (!presentation) {
         return res.status(404).json({ error: "Presentation not found" });
@@ -635,7 +634,7 @@ Generate a JSON response with this structure:
       res.json({
         id: presentation.id,
         propertyAddress: presentation.propertyAddress,
-        createdAt: presentation.createdAt,
+        createdAt: presentation.createdAt?.toISOString(),
         pdfUrl: `/api/presentations/${id}/pdf`,
         shareUrl: `/share/${id}`,
       });
@@ -777,13 +776,59 @@ Generate a JSON response with this structure:
     }
   });
 
-  // List all saved presentations
+  // === USER PREFERENCES (auto-save working state) ===
+
+  app.get("/api/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+      res.json(prefs || { workingDealState: null, workingUserComps: null, settings: null });
+    } catch (error) {
+      console.error("Get preferences error:", error);
+      res.status(500).json({ error: "Failed to get preferences" });
+    }
+  });
+
+  app.put("/api/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workingDealState, workingUserComps, settings } = req.body;
+
+      const [existing] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+
+      if (existing) {
+        const updateData: Record<string, any> = { updatedAt: new Date() };
+        if (workingDealState !== undefined) updateData.workingDealState = workingDealState;
+        if (workingUserComps !== undefined) updateData.workingUserComps = workingUserComps;
+        if (settings !== undefined) updateData.settings = settings;
+
+        const [prefs] = await db.update(userPreferences)
+          .set(updateData)
+          .where(eq(userPreferences.userId, userId))
+          .returning();
+        res.json(prefs);
+      } else {
+        const [prefs] = await db.insert(userPreferences).values({
+          userId,
+          workingDealState: workingDealState || null,
+          workingUserComps: workingUserComps || null,
+          settings: settings || null,
+        }).returning();
+        res.json(prefs);
+      }
+    } catch (error) {
+      console.error("Save preferences error:", error);
+      res.status(500).json({ error: "Failed to save preferences" });
+    }
+  });
+
   app.get("/api/presentations", async (req, res) => {
     try {
-      const presentations = Array.from(savedPresentations.values()).map(p => ({
+      const rows = await db.select().from(savedPresentations).orderBy(desc(savedPresentations.createdAt));
+      const presentations = rows.map(p => ({
         id: p.id,
         propertyAddress: p.propertyAddress,
-        createdAt: p.createdAt,
+        createdAt: p.createdAt?.toISOString(),
         pdfUrl: `/api/presentations/${p.id}/pdf`,
         shareUrl: `/share/${p.id}`,
       }));

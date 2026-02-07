@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -226,6 +226,39 @@ export default function OfferIQ() {
   useEffect(() => {
     localStorage.setItem(USER_COMPS_STORAGE_KEY, JSON.stringify(userComps));
   }, [userComps]);
+
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasLoadedPrefsRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || currentDealId || hasLoadedPrefsRef.current) return;
+    hasLoadedPrefsRef.current = true;
+    fetch("/api/preferences", { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(prefs => {
+        if (prefs?.workingDealState) {
+          setState(prev => ({ ...getDefaultState(), ...prefs.workingDealState }));
+        }
+        if (prefs?.workingUserComps) {
+          setUserComps(prev => ({ ...getDefaultUserComps(), ...prefs.workingUserComps }));
+        }
+      })
+      .catch(() => {});
+  }, [isAuthenticated, currentDealId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || currentDealId) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      fetch("/api/preferences", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workingDealState: state, workingUserComps: userComps }),
+      }).catch(() => {});
+    }, 3000);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [state, userComps, isAuthenticated, currentDealId]);
 
   const handleUserCompsChange = useCallback((newUserComps: UserCompsState) => {
     setUserComps(newUserComps);
