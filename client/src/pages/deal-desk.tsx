@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation, useSearch } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UnderwritingSection } from "@/components/underwriting-section";
 import { OfferCalcSection } from "@/components/offer-calc-section";
@@ -9,10 +12,18 @@ import { OfferPresentationSection } from "@/components/offer-presentation-sectio
 import { calculateUnderwriting } from "@/lib/engines/underwriting";
 import { calculateOfferOutput } from "@/lib/engines/offer-calculation";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { isUnauthorizedError, redirectToLogin } from "@/lib/auth-utils";
 import {
   FileText,
   Calculator,
   Presentation,
+  Save,
+  FolderOpen,
+  Plus,
+  LogOut,
+  LogIn,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -52,8 +63,27 @@ function getDefaultState(): DealState {
   };
 }
 
+function getDealIdFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("deal");
+}
+
 export default function OfferIQ() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
+
+  const [currentDealId, setCurrentDealId] = useState<string | null>(getDealIdFromUrl);
+  const searchString = useSearch();
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const dealId = params.get("deal");
+    if (dealId !== currentDealId) {
+      setCurrentDealId(dealId);
+    }
+  }, [searchString]);
+
   const [state, setState] = useState<DealState>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -72,7 +102,7 @@ export default function OfferIQ() {
   const [manualARV, setManualARV] = useState(0);
   const [manualRepairs, setManualRepairs] = useState(0);
   const [presentationOutput, setPresentationOutput] = useState<PresentationOutput | null>(null);
-  
+
   const [userComps, setUserComps] = useState<UserCompsState>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(USER_COMPS_STORAGE_KEY);
@@ -85,6 +115,102 @@ export default function OfferIQ() {
       }
     }
     return getDefaultUserComps();
+  });
+
+  const { data: loadedDeal, isLoading: isDealLoading } = useQuery({
+    queryKey: ["/api/deals", currentDealId],
+    queryFn: async () => {
+      if (!currentDealId) return null;
+      const res = await fetch(`/api/deals/${currentDealId}`, { credentials: "include" });
+      if (res.status === 401) {
+        redirectToLogin(toast as any);
+        return null;
+      }
+      if (!res.ok) throw new Error("Failed to load deal");
+      return res.json();
+    },
+    enabled: !!currentDealId,
+  });
+
+  useEffect(() => {
+    if (loadedDeal && currentDealId) {
+      const interviewAnswers = (loadedDeal.interviewAnswers || {}) as Record<string, any>;
+      const underwritingData = (loadedDeal.underwritingData || {}) as Record<string, any>;
+      const offerData = (loadedDeal.offerData || {}) as Record<string, any>;
+      const savedUserComps = loadedDeal.userComps as UserCompsState | null;
+      const savedPresentationData = loadedDeal.presentationData as PresentationOutput | null;
+
+      setState({
+        property: {
+          address: loadedDeal.propertyAddress || "",
+          ...(underwritingData.property || {}),
+        },
+        seller: interviewAnswers,
+        publicInfo: underwritingData.publicInfo || {},
+        avmBaselines: underwritingData.avmBaselines || {},
+        offerSettings: offerData.offerSettings || DEFAULT_OFFER_SETTINGS,
+        presentationInput: underwritingData.presentationInput || { callNotes: [], keySellerConstraints: [] },
+      });
+
+      if (underwritingData.manualAsIsEstimate !== undefined) setManualAsIsEstimate(underwritingData.manualAsIsEstimate);
+      if (underwritingData.manualARV !== undefined) setManualARV(underwritingData.manualARV);
+      if (underwritingData.manualRepairs !== undefined) setManualRepairs(underwritingData.manualRepairs);
+      if (savedUserComps) setUserComps(savedUserComps);
+      if (savedPresentationData) setPresentationOutput(savedPresentationData);
+    }
+  }, [loadedDeal, currentDealId]);
+
+  const saveDealMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        propertyAddress: state.property.address || "Untitled Deal",
+        dealName: state.property.address || "Untitled Deal",
+        interviewAnswers: state.seller,
+        underwritingData: {
+          property: state.property,
+          underwritingOutput,
+          manualAsIsEstimate,
+          manualARV,
+          manualRepairs,
+          avmBaselines: state.avmBaselines,
+          publicInfo: state.publicInfo,
+          presentationInput: state.presentationInput,
+        },
+        offerData: {
+          offerOutput,
+          offerSettings: state.offerSettings,
+        },
+        compsData: null,
+        userComps,
+        presentationData: presentationOutput,
+        dealGrade: offerOutput?.dealGrade || null,
+        sellerOffer: offerOutput?.sellerOffer || null,
+        arv: underwritingOutput?.arv || null,
+      };
+
+      if (currentDealId) {
+        const res = await apiRequest("PATCH", `/api/deals/${currentDealId}`, payload);
+        return res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/deals", payload);
+        return res.json();
+      }
+    },
+    onSuccess: (data) => {
+      if (!currentDealId && data.id) {
+        setCurrentDealId(data.id);
+        window.history.replaceState(null, "", `/?deal=${data.id}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      toast({ description: "Deal saved successfully" });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        redirectToLogin(toast as any);
+        return;
+      }
+      toast({ description: "Failed to save deal", variant: "destructive" });
+    },
   });
 
   useEffect(() => {
@@ -143,16 +269,39 @@ export default function OfferIQ() {
 
   const handleReset = () => {
     if (confirm("Are you sure you want to reset all data? This cannot be undone.")) {
-      setState(getDefaultState());
-      setManualAsIsEstimate(0);
-      setManualARV(0);
-      setManualRepairs(0);
-      setPresentationOutput(null);
-      setUserComps(getDefaultUserComps());
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(USER_COMPS_STORAGE_KEY);
-      toast({ description: "All data has been reset" });
+      doReset();
     }
+  };
+
+  const doReset = () => {
+    setState(getDefaultState());
+    setManualAsIsEstimate(0);
+    setManualARV(0);
+    setManualRepairs(0);
+    setPresentationOutput(null);
+    setUserComps(getDefaultUserComps());
+    setCurrentDealId(null);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(USER_COMPS_STORAGE_KEY);
+    window.history.replaceState(null, "", "/");
+  };
+
+  const handleNewDeal = () => {
+    const hasData = state.property.address || Object.keys(state.seller).length > 0;
+    if (hasData) {
+      handleReset();
+    } else {
+      doReset();
+      toast({ description: "Ready for a new deal" });
+    }
+  };
+
+  const handleSaveDeal = () => {
+    if (!isAuthenticated) {
+      window.location.href = "/api/login";
+      return;
+    }
+    saveDealMutation.mutate();
   };
 
   const handleCopyDealSummary = async () => {
@@ -250,7 +399,72 @@ export default function OfferIQ() {
             </Badge>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNewDeal}
+              data-testid="button-new-deal"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New Deal</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSaveDeal}
+              disabled={saveDealMutation.isPending}
+              data-testid="button-save-deal"
+            >
+              <Save className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                {saveDealMutation.isPending ? "Saving..." : "Save Deal"}
+              </span>
+            </Button>
+            {isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation("/deals")}
+                data-testid="link-my-deals"
+              >
+                <FolderOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">My Deals</span>
+              </Button>
+            )}
             <ThemeToggle />
+            {authLoading ? null : isAuthenticated && user ? (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8" data-testid="img-user-avatar">
+                  <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
+                  <AvatarFallback data-testid="text-user-initials">
+                    {(user.firstName?.[0] || "").toUpperCase()}
+                    {(user.lastName?.[0] || "").toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium hidden sm:inline" data-testid="text-user-name">
+                  {user.firstName}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => logout()}
+                  data-testid="button-logout"
+                  aria-label="Log out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { window.location.href = "/api/login"; }}
+                data-testid="button-sign-in"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Sign In</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>

@@ -8,7 +8,9 @@ A comprehensive real estate deal underwriting application with three main engine
 - **Underwriting Engine**: AVM blending (Zillow 45%, Redfin 35%, Other 20%), repair estimates, confidence scoring
 - **Offer Calculation Engine**: Investor buy price, seller offer, 3-tier offer ladder (Fast Yes/Fair/Stretch with ±8% adjustments), deal grading (A/B/C/D)
 - **Offer Presentation Engine**: AI-powered negotiation plans using Tony Robbins 6 Human Needs and DISC profiling with ethical guardrails
-- localStorage autosave for all inputs
+- **User Management**: Replit Auth (OIDC) with login/logout, saved deals per user
+- **Saved Deals**: CRUD operations for deal analyses stored in PostgreSQL, accessible from /deals dashboard
+- localStorage autosave for all inputs (fallback when not logged in)
 - JSON export and copy-to-clipboard functionality
 
 ## User Preferences
@@ -38,14 +40,24 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/property/valuation` - Fetch property details and RentCast AVM estimates
 - `POST /api/comps` - Fetch comparable sales data from RentCast AVM endpoint
 - `POST /api/ai/presentation` - Generate AI-powered negotiation plan with ethical guardrails
+- `GET /api/deals` - List user's saved deals (auth required)
+- `GET /api/deals/:id` - Get single saved deal (auth required)
+- `POST /api/deals` - Create saved deal (auth required)
+- `PATCH /api/deals/:id` - Update saved deal (auth required)
+- `DELETE /api/deals/:id` - Delete saved deal (auth required)
+- `/api/login` - Replit Auth OIDC login
+- `/api/logout` - Replit Auth OIDC logout
+- `/api/auth/user` - Get current authenticated user
 
 ### Data Storage
-- **Client Persistence**: localStorage for all deal inputs, settings, and AI results
-- **Database**: PostgreSQL with Drizzle ORM (available for future features)
-- **Schema Location**: `shared/schema.ts` contains Drizzle table definitions and Zod validation schemas
+- **Client Persistence**: localStorage for all deal inputs, settings, and AI results (fallback)
+- **Database**: PostgreSQL with Drizzle ORM for users, sessions, and saved deals
+- **Schema Location**: `shared/schema.ts` re-exports from `shared/models/auth.ts` and `shared/models/savedDeals.ts`
+- **Auth**: Replit Auth (OIDC) with passport, sessions stored in PostgreSQL
 
 ### Key Files
 - `client/src/pages/deal-desk.tsx` - Main OfferIQ page with tabbed 3-engine layout
+- `client/src/pages/saved-deals.tsx` - Saved deals dashboard with CRUD operations
 - `client/src/types.ts` - Complete type definitions for all engines (includes ComparableSale, CompsData)
 - `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI with comps integration
 - `client/src/components/comps-section.tsx` - Comparable sales display with sortable table and statistics

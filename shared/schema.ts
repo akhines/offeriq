@@ -408,9 +408,8 @@ export interface NegotiationPlan {
 }
 
 export * from "./models/chat";
-
-export { users, insertUserSchema } from "./models/users";
-export type { InsertUser, User } from "./models/users";
+export * from "./models/auth";
+export * from "./models/savedDeals";
 
 // Saved Presentations schema
 export const savedPresentationSchema = z.object({

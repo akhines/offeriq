@@ -1,9 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, type SavedPresentation } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, type SavedPresentation, savedDeals, insertSavedDealSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { isAuthenticated } from "./replit_integrations/auth";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 // In-memory store for saved presentations (could be moved to database later)
@@ -641,6 +644,103 @@ Generate a JSON response with this structure:
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to get presentation" 
       });
+    }
+  });
+
+  // === SAVED DEALS CRUD (auth protected) ===
+
+  app.get("/api/deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const deals = await db.select().from(savedDeals)
+        .where(eq(savedDeals.userId, userId))
+        .orderBy(desc(savedDeals.updatedAt));
+      res.json(deals);
+    } catch (error) {
+      console.error("List deals error:", error);
+      res.status(500).json({ error: "Failed to list deals" });
+    }
+  });
+
+  app.get("/api/deals/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const [deal] = await db.select().from(savedDeals)
+        .where(eq(savedDeals.id, id));
+
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      res.json(deal);
+    } catch (error) {
+      console.error("Get deal error:", error);
+      res.status(500).json({ error: "Failed to get deal" });
+    }
+  });
+
+  app.post("/api/deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertSavedDealSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromError(parseResult.error);
+        return res.status(400).json({ error: validationError.toString() });
+      }
+
+      const [deal] = await db.insert(savedDeals).values({
+        ...parseResult.data,
+        userId,
+      }).returning();
+
+      res.json(deal);
+    } catch (error) {
+      console.error("Create deal error:", error);
+      res.status(500).json({ error: "Failed to save deal" });
+    }
+  });
+
+  app.patch("/api/deals/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const [existing] = await db.select().from(savedDeals).where(eq(savedDeals.id, id));
+      if (!existing) return res.status(404).json({ error: "Deal not found" });
+      if (existing.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      const parseResult = insertSavedDealSchema.partial().safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromError(parseResult.error);
+        return res.status(400).json({ error: validationError.toString() });
+      }
+
+      const [deal] = await db.update(savedDeals)
+        .set({ ...parseResult.data, updatedAt: new Date() })
+        .where(eq(savedDeals.id, id))
+        .returning();
+
+      res.json(deal);
+    } catch (error) {
+      console.error("Update deal error:", error);
+      res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+
+  app.delete("/api/deals/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const [existing] = await db.select().from(savedDeals).where(eq(savedDeals.id, id));
+      if (!existing) return res.status(404).json({ error: "Deal not found" });
+      if (existing.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      await db.delete(savedDeals).where(eq(savedDeals.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete deal error:", error);
+      res.status(500).json({ error: "Failed to delete deal" });
     }
   });
 
