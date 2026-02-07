@@ -54,31 +54,40 @@ export function AddressAutocomplete({
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
     if (!apiKey) return;
 
-    const initPlaces = async () => {
-      try {
-        if (typeof google === "undefined" || !google.maps) return;
+    let cancelled = false;
 
-        if (typeof google.maps.importLibrary === "function") {
-          await google.maps.importLibrary("places");
+    const initPlaces = async (retries = 5) => {
+      for (let i = 0; i < retries; i++) {
+        if (cancelled) return;
+        try {
+          if (typeof google !== "undefined" && google.maps) {
+            if (typeof google.maps.importLibrary === "function") {
+              const placesLib = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
+              if (placesLib?.AutocompleteSuggestion) {
+                sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+                setIsReady(true);
+                return;
+              }
+            } else if (google.maps.places?.AutocompleteSuggestion) {
+              sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+              setIsReady(true);
+              return;
+            }
+          }
+        } catch (err) {
+          if (i === retries - 1) console.warn("Places init failed after retries:", err);
         }
-
-        if (google.maps?.places?.AutocompleteSuggestion) {
-          sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
-          setIsReady(true);
-        }
-      } catch (err) {
-        console.warn("Google Places init failed:", err);
+        await new Promise(r => setTimeout(r, 500 * (i + 1)));
       }
     };
 
-    if (typeof google !== "undefined" && google.maps) {
-      initPlaces();
-      return;
-    }
-
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
-      existingScript.addEventListener("load", () => initPlaces());
+      if (typeof google !== "undefined" && google.maps) {
+        initPlaces();
+      } else {
+        existingScript.addEventListener("load", () => initPlaces());
+      }
       return;
     }
 
@@ -91,6 +100,7 @@ export function AddressAutocomplete({
     document.head.appendChild(script);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
