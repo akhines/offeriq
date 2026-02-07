@@ -54,33 +54,29 @@ export function AddressAutocomplete({
     const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
     if (!apiKey) return;
 
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    
-    const initPlaces = async () => {
-      try {
-        await google.maps.importLibrary("places");
+    const initPlaces = () => {
+      if (typeof google !== "undefined" && google.maps?.places?.AutocompleteSuggestion) {
         sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
         setIsReady(true);
-      } catch (err) {
-        console.warn("Failed to initialize Google Places:", err);
       }
     };
 
-    if (typeof google !== "undefined" && google.maps) {
+    if (typeof google !== "undefined" && google.maps?.places) {
       initPlaces();
       return;
     }
 
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
-      existingScript.addEventListener("load", () => initPlaces());
+      existingScript.addEventListener("load", initPlaces);
       return;
     }
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
     script.async = true;
     script.defer = true;
-    script.onload = () => initPlaces();
+    script.onload = initPlaces;
     script.onerror = () => console.warn("Failed to load Google Maps script");
     document.head.appendChild(script);
 
