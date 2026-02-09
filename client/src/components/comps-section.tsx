@@ -106,55 +106,11 @@ export function CompsSection({
   const [dateRangeMonths, setDateRangeMonths] = useState(24);
   const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Home className="h-5 w-5" />
-            Comparable Sales
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-pulse text-muted-foreground">Loading comparable sales...</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!compsData || compsData.comps.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Home className="h-5 w-5" />
-            Comparable Sales
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No comparable sales found.</p>
-            <p className="text-sm">Fetch property data to load comps.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection(field === "distanceMiles" ? "asc" : "desc");
-    }
-  };
+  const comps = compsData?.comps ?? [];
 
   const filteredComps = useMemo(() => {
-    let result = [...compsData.comps];
+    if (comps.length === 0) return [];
+    let result = [...comps];
 
     if (maxDistance < 5) {
       result = result.filter(c => c.distanceMiles <= maxDistance);
@@ -182,9 +138,10 @@ export function CompsSection({
     }
 
     return result;
-  }, [compsData.comps, maxDistance, dateRangeMonths, propertyTypeFilter]);
+  }, [comps, maxDistance, dateRangeMonths, propertyTypeFilter]);
 
   const sortedComps = useMemo(() => {
+    if (filteredComps.length === 0) return [];
     return [...filteredComps].sort((a, b) => {
       let aVal: number | string = (a as any)[sortField] ?? 0;
       let bVal: number | string = (b as any)[sortField] ?? 0;
@@ -204,6 +161,15 @@ export function CompsSection({
   const displayedComps = showAllComps ? sortedComps : sortedComps.slice(0, 5);
 
   const filteredStats = useMemo(() => {
+    if (filteredComps.length === 0) {
+      return {
+        avgPricePerSqft: 0,
+        medianPrice: 0,
+        avgPrice: 0,
+        priceRange: { min: 0, max: 0 },
+        sqftRange: { min: 0, max: 0 },
+      };
+    }
     const prices = filteredComps.map(c => c.price);
     const pricesPerSqft = filteredComps.map(c => c.pricePerSqft);
     return {
@@ -228,8 +194,55 @@ export function CompsSection({
   }, [filteredComps]);
 
   const hasActiveFilters = maxDistance < 5 || dateRangeMonths < 24 || propertyTypeFilter !== "all";
-  const hasMapData = compsData.comps.some(c => c.latitude && c.longitude) ||
-    (compsData.subjectProperty?.latitude && compsData.subjectProperty?.longitude);
+  const hasMapData = comps.some(c => c.latitude && c.longitude) ||
+    (compsData?.subjectProperty?.latitude && compsData?.subjectProperty?.longitude);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Home className="h-5 w-5" />
+            Comparable Sales
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-pulse text-muted-foreground">Loading comparable sales...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!compsData || comps.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Home className="h-5 w-5" />
+            Comparable Sales
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-6 text-muted-foreground">
+            <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No comparable sales found.</p>
+            <p className="text-sm">Fetch property data to load comps.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection(field === "distanceMiles" ? "asc" : "desc");
+    }
+  };
 
   const SortButton = ({ field, children, testId }: { field: SortField; children: React.ReactNode; testId: string }) => (
     <span
