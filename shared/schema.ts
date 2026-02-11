@@ -418,6 +418,7 @@ export * from "./models/auth";
 export * from "./models/savedDeals";
 export * from "./models/savedPresentations";
 export * from "./models/userPreferences";
+export * from "./models/sharedOffers";
 
 export const createPresentationSchema = z.object({
   propertyAddress: z.string(),
