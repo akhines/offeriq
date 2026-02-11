@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SHAREABLE_SECTIONS, type SectionId } from "@/components/share-offer-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -38,6 +40,9 @@ import {
   Calendar,
   Share2,
   Loader2,
+  Check,
+  Link2,
+  Copy,
 } from "lucide-react";
 import type { SavedDeal } from "@shared/models/savedDeals";
 
@@ -102,6 +107,10 @@ export default function SavedDeals() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [creatingSellerId, setCreatingSellerId] = useState<string | null>(null);
   const [dealShareUrls, setDealShareUrls] = useState<Record<string, string>>({});
+  const [sellerDialogDeal, setSellerDialogDeal] = useState<SavedDeal | null>(null);
+  const [sellerSections, setSellerSections] = useState<Set<SectionId>>(new Set());
+  const [sellerShareUrl, setSellerShareUrl] = useState<string | null>(null);
+  const [sellerCopied, setSellerCopied] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -155,9 +164,41 @@ export default function SavedDeals() {
     }
   };
 
-  const handleCreateSellerPage = async (deal: SavedDeal) => {
-    if (dealShareUrls[deal.id]) {
-      window.open(dealShareUrls[deal.id], "_blank");
+  const getDealAvailableSections = (deal: SavedDeal): Set<SectionId> => {
+    const underwritingData = deal.underwritingData as Record<string, any> | null;
+    const offerData = deal.offerData as Record<string, any> | null;
+    const presentationData = deal.presentationData as Record<string, any> | null;
+    const available = new Set<SectionId>();
+    if (deal.propertyAddress) available.add("property_details");
+    if (underwritingData?.underwritingOutput) { available.add("avm_valuation"); available.add("comparable_sales"); }
+    if (offerData?.offerOutput) { available.add("offer_formula"); available.add("offer_ladder"); available.add("deal_grade"); }
+    if (presentationData?.presentationOutput) available.add("negotiation_plan");
+    return available;
+  };
+
+  const openSellerDialog = (deal: SavedDeal) => {
+    const available = getDealAvailableSections(deal);
+    setSellerDialogDeal(deal);
+    setSellerSections(new Set(available));
+    setSellerShareUrl(null);
+    setSellerCopied(false);
+  };
+
+  const toggleSellerSection = (id: SectionId) => {
+    setSellerSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleCreateSellerPage = async () => {
+    const deal = sellerDialogDeal;
+    if (!deal) return;
+
+    if (sellerSections.size === 0) {
+      toast({ description: "Select at least one section to share", variant: "destructive" });
       return;
     }
 
@@ -172,7 +213,7 @@ export default function SavedDeals() {
         if (existing) {
           const existingUrl = `${window.location.origin}/s/${existing.code}`;
           setDealShareUrls((prev) => ({ ...prev, [deal.id]: existingUrl }));
-          window.open(existingUrl, "_blank");
+          setSellerShareUrl(existingUrl);
           setCreatingSellerId(null);
           return;
         }
@@ -181,21 +222,6 @@ export default function SavedDeals() {
       const underwritingData = deal.underwritingData as Record<string, any> | null;
       const offerData = deal.offerData as Record<string, any> | null;
       const presentationData = deal.presentationData as Record<string, any> | null;
-
-      const sections: string[] = [];
-      if (deal.propertyAddress) sections.push("property_details");
-      if (underwritingData?.underwritingOutput) {
-        sections.push("avm_valuation");
-        sections.push("comparable_sales");
-      }
-      if (offerData?.offerOutput) {
-        sections.push("offer_formula");
-        sections.push("offer_ladder");
-        sections.push("deal_grade");
-      }
-      if (presentationData?.presentationOutput) {
-        sections.push("negotiation_plan");
-      }
 
       const dealSnapshot = {
         property: underwritingData?.property || { address: deal.propertyAddress },
@@ -208,7 +234,7 @@ export default function SavedDeals() {
 
       const res = await apiRequest("POST", "/api/shares", {
         propertyAddress: deal.propertyAddress || "Unknown Property",
-        sections,
+        sections: Array.from(sellerSections),
         dealSnapshot,
         expiresInDays: null,
       });
@@ -216,13 +242,21 @@ export default function SavedDeals() {
       const data = await res.json();
       const fullUrl = `${window.location.origin}${data.url}`;
       setDealShareUrls((prev) => ({ ...prev, [deal.id]: fullUrl }));
-      window.open(fullUrl, "_blank");
-      toast({ description: "Seller page created and opened" });
+      setSellerShareUrl(fullUrl);
+      toast({ description: "Seller page link created" });
     } catch {
       toast({ description: "Failed to create seller page", variant: "destructive" });
     } finally {
       setCreatingSellerId(null);
     }
+  };
+
+  const handleCopySellerUrl = async () => {
+    if (!sellerShareUrl) return;
+    await navigator.clipboard.writeText(sellerShareUrl);
+    setSellerCopied(true);
+    setTimeout(() => setSellerCopied(false), 2000);
+    toast({ description: "Link copied to clipboard" });
   };
 
   const handleToggleSelect = (id: string) => {
@@ -589,15 +623,10 @@ export default function SavedDeals() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleCreateSellerPage(deal)}
-                      disabled={creatingSellerId === deal.id}
+                      onClick={() => openSellerDialog(deal)}
                       data-testid={`button-seller-page-${deal.id}`}
                     >
-                      {creatingSellerId === deal.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Share2 className="h-4 w-4" />
-                      )}
+                      <Share2 className="h-4 w-4" />
                       Seller Page
                     </Button>
                     {pdfUrl && (
@@ -647,6 +676,112 @@ export default function SavedDeals() {
           </div>
         )}
       </main>
+
+      <Dialog open={!!sellerDialogDeal} onOpenChange={(open) => { if (!open) setSellerDialogDeal(null); }}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Create Seller Page
+            </DialogTitle>
+          </DialogHeader>
+
+          {sellerShareUrl ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Your seller page is ready. Copy this link and send it to the property owner.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs bg-muted px-3 py-2.5 rounded-md truncate" data-testid="text-seller-share-url">
+                  {sellerShareUrl}
+                </code>
+                <Button size="icon" variant="outline" onClick={handleCopySellerUrl} data-testid="button-copy-seller-url">
+                  {sellerCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1" variant="outline" onClick={() => window.open(sellerShareUrl, "_blank")} data-testid="button-preview-seller">
+                  <ExternalLink className="h-4 w-4 mr-1.5" />
+                  Preview
+                </Button>
+                <Button className="flex-1" variant="outline" onClick={() => { setSellerShareUrl(null); setSellerCopied(false); }} data-testid="button-create-new-seller">
+                  Create New
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Choose which sections the seller will see on their page.
+              </p>
+              {sellerDialogDeal && (
+                <p className="text-sm font-medium truncate">
+                  {sellerDialogDeal.propertyAddress || sellerDialogDeal.dealName || "Untitled Deal"}
+                </p>
+              )}
+              <div className="space-y-1.5">
+                {SHAREABLE_SECTIONS.map((section) => {
+                  const available = sellerDialogDeal ? getDealAvailableSections(sellerDialogDeal).has(section.id) : false;
+                  const selected = sellerSections.has(section.id);
+                  const Icon = section.icon;
+
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      disabled={!available}
+                      onClick={() => toggleSellerSection(section.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
+                        !available
+                          ? "opacity-40 cursor-not-allowed"
+                          : selected
+                            ? "bg-primary/10 border border-primary/30"
+                            : "hover-elevate border border-transparent"
+                      }`}
+                      data-testid={`toggle-seller-section-${section.id}`}
+                    >
+                      <div className={`flex items-center justify-center h-8 w-8 rounded-md ${
+                        selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      }`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{section.label}</div>
+                        <div className="text-xs text-muted-foreground truncate">{section.description}</div>
+                      </div>
+                      {selected && available && (
+                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                      )}
+                      {!available && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0">No data</Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handleCreateSellerPage}
+                disabled={creatingSellerId !== null || sellerSections.size === 0}
+                data-testid="button-generate-seller-link"
+              >
+                {creatingSellerId ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Generate Seller Page Link
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
