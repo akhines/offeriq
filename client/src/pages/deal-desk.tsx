@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError, redirectToLogin } from "@/lib/auth-utils";
+import { ShareOfferDialog } from "@/components/share-offer-dialog";
 import {
   FileText,
   Calculator,
@@ -461,6 +462,15 @@ export default function OfferIQ() {
                 {saveDealMutation.isPending ? "Saving..." : "Save Deal"}
               </span>
             </Button>
+            <ShareOfferDialog
+              property={state.property}
+              avmBaselines={state.avmBaselines}
+              underwritingOutput={underwritingOutput}
+              offerOutput={offerOutput}
+              offerSettings={state.offerSettings}
+              presentationOutput={presentationOutput}
+              isAuthenticated={isAuthenticated}
+            />
             {isAuthenticated && (
               <Button
                 variant="ghost"

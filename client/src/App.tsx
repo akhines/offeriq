@@ -10,6 +10,7 @@ import CompareDeals from "@/pages/compare-deals";
 import PricingPage from "@/pages/pricing";
 import AccountPage from "@/pages/account";
 import CheckoutSuccess from "@/pages/checkout-success";
+import SharedOfferPage from "@/pages/shared-offer";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/account" component={AccountPage} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/s/:code" component={SharedOfferPage} />
       <Route component={NotFound} />
     </Switch>
   );

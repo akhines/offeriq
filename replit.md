@@ -48,6 +48,10 @@ Preferred communication style: Simple, everyday language.
 - `PATCH /api/deals/:id/archive` - Toggle archive/restore (auth required)
 - `GET /api/preferences` - Get user preferences/working state (auth required)
 - `PUT /api/preferences` - Save user preferences/working state (auth required)
+- `POST /api/shares` - Create shared offer link with section selection (auth required)
+- `GET /api/shares` - List user's shared links (auth required)
+- `PATCH /api/shares/:code` - Deactivate a shared link (auth required)
+- `GET /api/s/:code` - Public endpoint to fetch shared offer data (no auth)
 - `/api/login` - Replit Auth OIDC login
 - `/api/logout` - Replit Auth OIDC logout
 - `/api/auth/user` - Get current authenticated user

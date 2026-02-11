@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences, users } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences, users, sharedOffers } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { isAuthenticated } from "./replit_integrations/auth";
@@ -1007,6 +1007,130 @@ Generate a JSON response with this structure:
     } catch (error) {
       console.error("Sync subscription error:", error);
       res.status(500).json({ error: "Failed to sync subscription" });
+    }
+  });
+
+  // === Shared Offer Links ===
+
+  function generateShortCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let code = "";
+    for (let i = 0; i < 7; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  app.post("/api/shares", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { propertyAddress, sections, dealSnapshot, expiresInDays } = req.body;
+
+      if (!propertyAddress || !sections || !Array.isArray(sections) || sections.length === 0) {
+        return res.status(400).json({ error: "Property address and at least one section are required" });
+      }
+
+      if (!dealSnapshot) {
+        return res.status(400).json({ error: "Deal data is required to create a share link" });
+      }
+
+      let code = generateShortCode();
+      let attempts = 0;
+      while (attempts < 5) {
+        const existing = await db.select().from(sharedOffers).where(eq(sharedOffers.code, code));
+        if (existing.length === 0) break;
+        code = generateShortCode();
+        attempts++;
+      }
+
+      const expiresAt = expiresInDays
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const [shared] = await db.insert(sharedOffers).values({
+        code,
+        userId,
+        propertyAddress,
+        sections,
+        dealSnapshot,
+        isActive: true,
+        expiresAt,
+      }).returning();
+
+      res.json({
+        id: shared.id,
+        code: shared.code,
+        url: `/s/${shared.code}`,
+        expiresAt: shared.expiresAt,
+      });
+    } catch (error) {
+      console.error("Create share error:", error);
+      res.status(500).json({ error: "Failed to create share link" });
+    }
+  });
+
+  app.get("/api/shares", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shares = await db.select().from(sharedOffers)
+        .where(eq(sharedOffers.userId, userId))
+        .orderBy(desc(sharedOffers.createdAt));
+      res.json({ shares });
+    } catch (error) {
+      console.error("List shares error:", error);
+      res.status(500).json({ error: "Failed to list shares" });
+    }
+  });
+
+  app.patch("/api/shares/:code", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { code } = req.params;
+      const { isActive } = req.body;
+
+      const [updated] = await db.update(sharedOffers)
+        .set({ isActive: isActive ?? false })
+        .where(and(eq(sharedOffers.code, code), eq(sharedOffers.userId, userId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Share link not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Update share error:", error);
+      res.status(500).json({ error: "Failed to update share link" });
+    }
+  });
+
+  app.get("/api/s/:code", async (req, res) => {
+    try {
+      const { code } = req.params;
+      const [shared] = await db.select().from(sharedOffers)
+        .where(eq(sharedOffers.code, code));
+
+      if (!shared) {
+        return res.status(404).json({ error: "Share link not found" });
+      }
+
+      if (!shared.isActive) {
+        return res.status(410).json({ error: "This share link has been deactivated" });
+      }
+
+      if (shared.expiresAt && new Date(shared.expiresAt) < new Date()) {
+        return res.status(410).json({ error: "This share link has expired" });
+      }
+
+      res.json({
+        propertyAddress: shared.propertyAddress,
+        sections: shared.sections,
+        dealSnapshot: shared.dealSnapshot,
+        createdAt: shared.createdAt,
+      });
+    } catch (error) {
+      console.error("Fetch share error:", error);
+      res.status(500).json({ error: "Failed to fetch share" });
     }
   });
 
