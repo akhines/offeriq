@@ -36,6 +36,8 @@ import {
   TrendingUp,
   Shield,
   Calendar,
+  Share2,
+  Loader2,
 } from "lucide-react";
 import type { SavedDeal } from "@shared/models/savedDeals";
 
@@ -98,6 +100,8 @@ export default function SavedDeals() {
   const [sortField, setSortField] = useState<SortField>("updatedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [creatingSellerId, setCreatingSellerId] = useState<string | null>(null);
+  const [dealShareUrls, setDealShareUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -148,6 +152,76 @@ export default function SavedDeals() {
   const handleDelete = (id: string) => {
     if (confirm("Delete this deal permanently? This cannot be undone.")) {
       deleteMutation.mutate(id);
+    }
+  };
+
+  const handleCreateSellerPage = async (deal: SavedDeal) => {
+    if (dealShareUrls[deal.id]) {
+      window.open(dealShareUrls[deal.id], "_blank");
+      return;
+    }
+
+    setCreatingSellerId(deal.id);
+    try {
+      const sharesRes = await fetch("/api/shares", { credentials: "include" });
+      if (sharesRes.ok) {
+        const sharesData = await sharesRes.json();
+        const existing = (sharesData.shares || []).find(
+          (s: any) => s.isActive && s.propertyAddress === deal.propertyAddress
+        );
+        if (existing) {
+          const existingUrl = `${window.location.origin}/s/${existing.code}`;
+          setDealShareUrls((prev) => ({ ...prev, [deal.id]: existingUrl }));
+          window.open(existingUrl, "_blank");
+          setCreatingSellerId(null);
+          return;
+        }
+      }
+
+      const underwritingData = deal.underwritingData as Record<string, any> | null;
+      const offerData = deal.offerData as Record<string, any> | null;
+      const presentationData = deal.presentationData as Record<string, any> | null;
+
+      const sections: string[] = [];
+      if (deal.propertyAddress) sections.push("property_details");
+      if (underwritingData?.underwritingOutput) {
+        sections.push("avm_valuation");
+        sections.push("comparable_sales");
+      }
+      if (offerData?.offerOutput) {
+        sections.push("offer_formula");
+        sections.push("offer_ladder");
+        sections.push("deal_grade");
+      }
+      if (presentationData?.presentationOutput) {
+        sections.push("negotiation_plan");
+      }
+
+      const dealSnapshot = {
+        property: underwritingData?.property || { address: deal.propertyAddress },
+        avmBaselines: underwritingData?.avmBaselines || {},
+        underwritingOutput: underwritingData?.underwritingOutput || null,
+        offerOutput: offerData?.offerOutput || null,
+        offerSettings: offerData?.offerSettings || {},
+        presentationOutput: presentationData?.presentationOutput || null,
+      };
+
+      const res = await apiRequest("POST", "/api/shares", {
+        propertyAddress: deal.propertyAddress || "Unknown Property",
+        sections,
+        dealSnapshot,
+        expiresInDays: null,
+      });
+
+      const data = await res.json();
+      const fullUrl = `${window.location.origin}${data.url}`;
+      setDealShareUrls((prev) => ({ ...prev, [deal.id]: fullUrl }));
+      window.open(fullUrl, "_blank");
+      toast({ description: "Seller page created and opened" });
+    } catch {
+      toast({ description: "Failed to create seller page", variant: "destructive" });
+    } finally {
+      setCreatingSellerId(null);
     }
   };
 
@@ -511,6 +585,20 @@ export default function SavedDeals() {
                     >
                       <ExternalLink className="h-4 w-4" />
                       Open
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCreateSellerPage(deal)}
+                      disabled={creatingSellerId === deal.id}
+                      data-testid={`button-seller-page-${deal.id}`}
+                    >
+                      {creatingSellerId === deal.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Share2 className="h-4 w-4" />
+                      )}
+                      Seller Page
                     </Button>
                     {pdfUrl && (
                       <Button
