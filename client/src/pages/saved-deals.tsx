@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { SHAREABLE_SECTIONS, type SectionId } from "@/components/share-offer-dialog";
+import { SHAREABLE_SECTIONS, DEFAULT_OFFER_BENEFITS, type SectionId, type OfferBenefit } from "@/components/share-offer-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -172,6 +172,7 @@ export default function SavedDeals() {
     if (deal.propertyAddress) available.add("property_details");
     if (underwritingData?.underwritingOutput) { available.add("avm_valuation"); }
     if ((deal as any).compsData?.comps?.length || (deal as any).userComps?.comps?.length) { available.add("comparable_sales"); }
+    available.add("offer_benefits");
     if (offerData?.offerOutput) { available.add("offer_formula"); available.add("offer_ladder"); available.add("deal_grade"); }
     if (presentationData?.presentationOutput) available.add("negotiation_plan");
     return available;
@@ -236,6 +237,7 @@ export default function SavedDeals() {
         presentationOutput: presentationData?.presentationOutput || null,
         compsData,
         userComps: userCompsData,
+        offerBenefits: sellerSections.has("offer_benefits") ? DEFAULT_OFFER_BENEFITS : null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {

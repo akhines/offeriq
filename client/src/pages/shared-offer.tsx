@@ -24,7 +24,10 @@ import {
   ExternalLink,
   MapPin,
   DollarSign,
+  Gift,
+  CheckCircle2,
 } from "lucide-react";
+import type { OfferBenefit } from "@/components/share-offer-dialog";
 import type {
   PropertyInfo,
   AVMBaselines,
@@ -46,6 +49,7 @@ interface DealSnapshot {
   presentationOutput: PresentationOutput | null;
   compsData?: CompsData | null;
   userComps?: UserCompsState | null;
+  offerBenefits?: OfferBenefit[] | null;
   companyLogoPath?: string | null;
   companyName?: string | null;
 }
@@ -176,6 +180,44 @@ function AVMValuationSection({ output }: { output: UnderwritingOutput }) {
             </p>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function OfferBenefitsSection({ benefits }: { benefits: OfferBenefit[] }) {
+  const benefitIcons = [
+    <Home className="h-5 w-5" />,
+    <DollarSign className="h-5 w-5" />,
+    <Gift className="h-5 w-5" />,
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          Why This Offer Works for You
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {benefits.map((benefit, i) => (
+            <div
+              key={i}
+              className="flex gap-3 p-3 rounded-md bg-muted/30"
+              data-testid={`benefit-card-${i}`}
+            >
+              <div className="flex items-center justify-center h-10 w-10 rounded-md bg-primary/10 text-primary flex-shrink-0">
+                {benefitIcons[i] || <CheckCircle2 className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold" data-testid={`benefit-title-${i}`}>{benefit.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed" data-testid={`benefit-desc-${i}`}>{benefit.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
@@ -629,6 +671,10 @@ export default function SharedOfferPage() {
 
         {sections.includes("comparable_sales") && (
           <ComparableSalesSection compsData={dealSnapshot?.compsData} userComps={dealSnapshot?.userComps} />
+        )}
+
+        {sections.includes("offer_benefits") && dealSnapshot?.offerBenefits && dealSnapshot.offerBenefits.length > 0 && (
+          <OfferBenefitsSection benefits={dealSnapshot.offerBenefits} />
         )}
 
         {sections.includes("offer_formula") && offerOutput && offerSettings && (
