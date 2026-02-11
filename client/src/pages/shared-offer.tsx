@@ -38,6 +38,8 @@ interface DealSnapshot {
   offerOutput: OfferOutput | null;
   offerSettings: OfferSettings;
   presentationOutput: PresentationOutput | null;
+  companyLogoPath?: string | null;
+  companyName?: string | null;
 }
 
 interface SharedOfferData {
@@ -464,15 +466,24 @@ export default function SharedOfferPage() {
   }
 
   const { sections, dealSnapshot } = data;
-  const { property, underwritingOutput, offerOutput, offerSettings, presentationOutput } = dealSnapshot;
+  const { property, underwritingOutput, offerOutput, offerSettings, presentationOutput, companyLogoPath, companyName } = dealSnapshot;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            <span className="font-bold">OfferIQ</span>
+            {companyLogoPath ? (
+              <img
+                src={companyLogoPath}
+                alt={companyName || "Company logo"}
+                className="h-8 w-8 rounded-md object-contain"
+                data-testid="img-shared-company-logo"
+              />
+            ) : (
+              <FileText className="h-5 w-5 text-primary" />
+            )}
+            <span className="font-bold" data-testid="text-shared-brand">{companyName || "OfferIQ"}</span>
             <Badge variant="secondary" className="text-xs hidden sm:inline-flex">Shared Offer</Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -487,11 +498,21 @@ export default function SharedOfferPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         <div className="text-center mb-6">
+          {companyLogoPath && (
+            <div className="flex justify-center mb-3">
+              <img
+                src={companyLogoPath}
+                alt={companyName || "Company logo"}
+                className="h-12 w-auto max-w-[180px] object-contain"
+                data-testid="img-shared-hero-logo"
+              />
+            </div>
+          )}
           <h1 className="text-2xl font-bold" data-testid="text-shared-title">
             {data.propertyAddress}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Offer package prepared for your review
+            {companyName ? `Offer package from ${companyName}` : "Offer package prepared for your review"}
           </p>
         </div>
 
@@ -526,7 +547,7 @@ export default function SharedOfferPage() {
         <div className="text-center pt-6 pb-8">
           <Separator className="mb-6" />
           <p className="text-xs text-muted-foreground">
-            Powered by OfferIQ
+            {companyName ? `${companyName} · ` : ""}Powered by OfferIQ
           </p>
         </div>
       </main>

@@ -824,6 +824,78 @@ Generate a JSON response with this structure:
     }
   });
 
+  app.post("/api/logo/upload-url", isAuthenticated, async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Logo upload URL error:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  app.post("/api/logo/save", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { objectPath } = req.body;
+
+      if (!objectPath) {
+        return res.status(400).json({ error: "objectPath is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      try {
+        await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+          owner: userId,
+          visibility: "public",
+        });
+      } catch (e) {
+        console.warn("Could not set logo ACL to public:", e);
+      }
+
+      const [existing] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+      const currentSettings = (existing?.settings as Record<string, any>) || {};
+      const newSettings = { ...currentSettings, companyLogoPath: objectPath };
+
+      if (existing) {
+        await db.update(userPreferences)
+          .set({ settings: newSettings, updatedAt: new Date() })
+          .where(eq(userPreferences.userId, userId));
+      } else {
+        await db.insert(userPreferences).values({
+          userId,
+          settings: newSettings,
+        });
+      }
+
+      res.json({ logoUrl: objectPath, success: true });
+    } catch (error) {
+      console.error("Save logo error:", error);
+      res.status(500).json({ error: "Failed to save logo" });
+    }
+  });
+
+  app.delete("/api/logo", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [existing] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+      if (existing) {
+        const currentSettings = (existing.settings as Record<string, any>) || {};
+        const { companyLogoPath, ...rest } = currentSettings;
+        await db.update(userPreferences)
+          .set({ settings: rest, updatedAt: new Date() })
+          .where(eq(userPreferences.userId, userId));
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete logo error:", error);
+      res.status(500).json({ error: "Failed to delete logo" });
+    }
+  });
+
   app.get("/api/presentations", async (req, res) => {
     try {
       const rows = await db.select().from(savedPresentations).orderBy(desc(savedPresentations.createdAt));
@@ -1034,6 +1106,17 @@ Generate a JSON response with this structure:
         return res.status(400).json({ error: "Deal data is required to create a share link" });
       }
 
+      const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+      const userSettings = (prefs?.settings as Record<string, any>) || {};
+      const companyLogoPath = userSettings.companyLogoPath || null;
+      const companyName = userSettings.companyName || null;
+
+      const enrichedSnapshot = {
+        ...dealSnapshot,
+        companyLogoPath,
+        companyName,
+      };
+
       let code = generateShortCode();
       let attempts = 0;
       while (attempts < 5) {
@@ -1052,7 +1135,7 @@ Generate a JSON response with this structure:
         userId,
         propertyAddress,
         sections,
-        dealSnapshot,
+        dealSnapshot: enrichedSnapshot,
         isActive: true,
         expiresAt,
       }).returning();
