@@ -170,7 +170,8 @@ export default function SavedDeals() {
     const presentationData = deal.presentationData as Record<string, any> | null;
     const available = new Set<SectionId>();
     if (deal.propertyAddress) available.add("property_details");
-    if (underwritingData?.underwritingOutput) { available.add("avm_valuation"); available.add("comparable_sales"); }
+    if (underwritingData?.underwritingOutput) { available.add("avm_valuation"); }
+    if ((deal as any).compsData?.comps?.length || (deal as any).userComps?.comps?.length) { available.add("comparable_sales"); }
     if (offerData?.offerOutput) { available.add("offer_formula"); available.add("offer_ladder"); available.add("deal_grade"); }
     if (presentationData?.presentationOutput) available.add("negotiation_plan");
     return available;
@@ -223,6 +224,9 @@ export default function SavedDeals() {
       const offerData = deal.offerData as Record<string, any> | null;
       const presentationData = deal.presentationData as Record<string, any> | null;
 
+      const compsData = (deal as any).compsData || null;
+      const userCompsData = (deal as any).userComps || null;
+
       const dealSnapshot = {
         property: underwritingData?.property || { address: deal.propertyAddress },
         avmBaselines: underwritingData?.avmBaselines || {},
@@ -230,6 +234,8 @@ export default function SavedDeals() {
         offerOutput: offerData?.offerOutput || null,
         offerSettings: offerData?.offerSettings || {},
         presentationOutput: presentationData?.presentationOutput || null,
+        compsData,
+        userComps: userCompsData,
       };
 
       const res = await apiRequest("POST", "/api/shares", {

@@ -105,6 +105,7 @@ export default function OfferIQ() {
   const [manualRepairs, setManualRepairs] = useState(0);
   const [presentationOutput, setPresentationOutput] = useState<PresentationOutput | null>(null);
   const [presentationPdfUrl, setPresentationPdfUrl] = useState<string | null>(null);
+  const [compsData, setCompsData] = useState<any>(null);
 
   const [userComps, setUserComps] = useState<UserCompsState>(() => {
     if (typeof window !== "undefined") {
@@ -184,7 +185,7 @@ export default function OfferIQ() {
           offerOutput,
           offerSettings: state.offerSettings,
         },
-        compsData: null,
+        compsData: compsData || null,
         userComps,
         presentationData: presentationOutput,
         dealGrade: offerOutput?.dealGrade || null,
@@ -469,6 +470,8 @@ export default function OfferIQ() {
               offerOutput={offerOutput}
               offerSettings={state.offerSettings}
               presentationOutput={presentationOutput}
+              compsData={compsData}
+              userComps={userComps}
               isAuthenticated={isAuthenticated}
             />
             {isAuthenticated && (
@@ -565,6 +568,7 @@ export default function OfferIQ() {
               onManualRepairsChange={setManualRepairs}
               userComps={userComps}
               onUserCompsChange={handleUserCompsChange}
+              onCompsDataChange={setCompsData}
             />
           </TabsContent>
 

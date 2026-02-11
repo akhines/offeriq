@@ -63,6 +63,8 @@ interface ShareOfferDialogProps {
   offerOutput: OfferOutput | null;
   offerSettings: OfferSettings;
   presentationOutput: PresentationOutput | null;
+  compsData?: any;
+  userComps?: any;
   isAuthenticated: boolean;
 }
 
@@ -75,6 +77,8 @@ export function ShareOfferDialog({
   offerOutput,
   offerSettings,
   presentationOutput,
+  compsData,
+  userComps,
   isAuthenticated,
 }: ShareOfferDialogProps) {
   const [open, setOpen] = useState(false);
@@ -125,7 +129,7 @@ export function ShareOfferDialog({
       case "avm_valuation":
         return !!underwritingOutput;
       case "comparable_sales":
-        return !!underwritingOutput;
+        return !!(compsData?.comps?.length || userComps?.comps?.length);
       case "offer_formula":
         return !!offerOutput;
       case "offer_ladder":
@@ -159,6 +163,8 @@ export function ShareOfferDialog({
         offerOutput,
         offerSettings,
         presentationOutput,
+        compsData: compsData || null,
+        userComps: userComps || null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {

@@ -35,6 +35,7 @@ interface UnderwritingSectionProps {
   onManualRepairsChange: (value: number) => void;
   userComps: UserCompsState;
   onUserCompsChange: (userComps: UserCompsState) => void;
+  onCompsDataChange?: (compsData: CompsData | null) => void;
 }
 
 function formatCurrency(value: number | undefined): string {
@@ -60,10 +61,15 @@ export function UnderwritingSection({
   onManualRepairsChange,
   userComps,
   onUserCompsChange,
+  onCompsDataChange,
 }: UnderwritingSectionProps) {
   const [isLoadingValuation, setIsLoadingValuation] = useState(false);
   const [isLoadingComps, setIsLoadingComps] = useState(false);
-  const [compsData, setCompsData] = useState<CompsData | null>(null);
+  const [compsData, setCompsDataLocal] = useState<CompsData | null>(null);
+  const setCompsData = (data: CompsData | null) => {
+    setCompsDataLocal(data);
+    onCompsDataChange?.(data);
+  };
   const [zillowLink, setZillowLink] = useState<string | null>(null);
   const [redfinLink, setRedfinLink] = useState<string | null>(null);
   const { toast } = useToast();

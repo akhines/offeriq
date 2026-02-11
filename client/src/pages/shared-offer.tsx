@@ -21,6 +21,9 @@ import {
   Ruler,
   CalendarDays,
   ArrowUpDown,
+  ExternalLink,
+  MapPin,
+  DollarSign,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -29,6 +32,9 @@ import type {
   OfferOutput,
   OfferSettings,
   PresentationOutput,
+  CompsData,
+  ComparableSale,
+  UserCompsState,
 } from "@/types";
 
 interface DealSnapshot {
@@ -38,6 +44,8 @@ interface DealSnapshot {
   offerOutput: OfferOutput | null;
   offerSettings: OfferSettings;
   presentationOutput: PresentationOutput | null;
+  compsData?: CompsData | null;
+  userComps?: UserCompsState | null;
   companyLogoPath?: string | null;
   companyName?: string | null;
 }
@@ -173,44 +181,139 @@ function AVMValuationSection({ output }: { output: UnderwritingOutput }) {
   );
 }
 
-function ComparableSalesSection({ output }: { output: UnderwritingOutput }) {
+function buildZillowLink(address: string): string {
+  const formatted = address.trim().replace(/\s+/g, "-").replace(/[,#]/g, "");
+  return `https://www.zillow.com/homes/${encodeURIComponent(formatted)}_rb/`;
+}
+
+function CompCard({ comp, index }: { comp: ComparableSale; index: number }) {
+  const zillowUrl = buildZillowLink(comp.address);
+  return (
+    <div className="p-3 rounded-md border bg-muted/20 space-y-2" data-testid={`comp-card-${index}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-tight" data-testid={`comp-address-${index}`}>{comp.address}</p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {comp.bedrooms > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                <BedDouble className="h-3 w-3" /> {comp.bedrooms}bd
+              </span>
+            )}
+            {comp.bathrooms > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                <Bath className="h-3 w-3" /> {comp.bathrooms}ba
+              </span>
+            )}
+            {comp.sqft > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                <Ruler className="h-3 w-3" /> {comp.sqft.toLocaleString()} sqft
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="font-mono font-semibold text-sm" data-testid={`comp-price-${index}`}>{formatCurrency(comp.price)}</p>
+          {comp.pricePerSqft > 0 && (
+            <p className="text-xs text-muted-foreground font-mono">${Math.round(comp.pricePerSqft)}/sqft</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {comp.soldDate && (
+            <Badge variant="outline" className="text-xs">
+              <CalendarDays className="h-3 w-3 mr-1" />
+              Sold {new Date(comp.soldDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+            </Badge>
+          )}
+          {comp.distanceMiles > 0 && (
+            <Badge variant="outline" className="text-xs">
+              <MapPin className="h-3 w-3 mr-1" />
+              {comp.distanceMiles.toFixed(1)} mi
+            </Badge>
+          )}
+        </div>
+        <a
+          href={zillowUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary font-medium"
+          data-testid={`comp-zillow-link-${index}`}
+        >
+          View on Zillow
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function ComparableSalesSection({ compsData, userComps }: { compsData?: CompsData | null; userComps?: UserCompsState | null }) {
+  const apiComps = compsData?.comps || [];
+  const userCompsList = userComps?.comps || [];
+  const hasApiComps = apiComps.length > 0;
+  const hasUserComps = userCompsList.length > 0;
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
-          Market Comparables
+          Comparable Sales
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            AVM blend sources used for this valuation:
-          </p>
-          {output.avmBlendUsed.length > 0 ? (
-            <div className="space-y-2">
-              {output.avmBlendUsed.map((blend, i) => (
-                <div key={i} className="flex items-center justify-between p-2 bg-muted/30 rounded-md">
-                  <span className="text-sm font-medium">{blend.source}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm">{formatCurrency(blend.value)}</span>
-                    <Badge variant="outline" className="text-xs">{Math.round(blend.weight * 100)}%</Badge>
-                  </div>
+        <div className="space-y-4">
+          {hasApiComps && compsData && (
+            <>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 bg-muted/30 rounded-md">
+                  <p className="text-xs text-muted-foreground mb-1">Avg $/Sqft</p>
+                  <p className="font-mono font-semibold">${Math.round(compsData.avgPricePerSqft)}</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No AVM data available</p>
-          )}
-          {output.drivers.length > 0 && (
-            <div className="mt-3">
-              <p className="text-sm font-medium mb-1">Confidence Drivers</p>
-              <div className="flex flex-wrap gap-1.5">
-                {output.drivers.map((driver, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">{driver}</Badge>
+                <div className="p-3 bg-muted/30 rounded-md">
+                  <p className="text-xs text-muted-foreground mb-1">Median Price</p>
+                  <p className="font-mono font-semibold">{formatCurrency(compsData.medianPrice)}</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-md">
+                  <p className="text-xs text-muted-foreground mb-1">Suggested ARV</p>
+                  <p className="font-mono font-semibold text-primary">{formatCurrency(compsData.suggestedARV)}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{apiComps.length} Comparable Properties</p>
+                {apiComps.map((comp, i) => (
+                  <CompCard key={i} comp={comp} index={i} />
                 ))}
               </div>
-            </div>
+            </>
+          )}
+
+          {hasUserComps && (
+            <>
+              {hasApiComps && <Separator />}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Selected Comparables</p>
+                {userCompsList.map((uc, i) => {
+                  const comp: ComparableSale = {
+                    address: uc.address,
+                    price: uc.price,
+                    sqft: uc.sqft || 0,
+                    pricePerSqft: uc.sqft && uc.sqft > 0 ? uc.price / uc.sqft : 0,
+                    bedrooms: uc.beds || 0,
+                    bathrooms: uc.baths || 0,
+                    yearBuilt: 0,
+                    soldDate: uc.soldDate || "",
+                    distanceMiles: 0,
+                  };
+                  return <CompCard key={`user-${i}`} comp={comp} index={100 + i} />;
+                })}
+              </div>
+            </>
+          )}
+
+          {!hasApiComps && !hasUserComps && (
+            <p className="text-sm text-muted-foreground text-center py-4">No comparable sales data available for this analysis.</p>
           )}
         </div>
       </CardContent>
@@ -524,8 +627,8 @@ export default function SharedOfferPage() {
           <AVMValuationSection output={underwritingOutput} />
         )}
 
-        {sections.includes("comparable_sales") && underwritingOutput && (
-          <ComparableSalesSection output={underwritingOutput} />
+        {sections.includes("comparable_sales") && (
+          <ComparableSalesSection compsData={dealSnapshot?.compsData} userComps={dealSnapshot?.userComps} />
         )}
 
         {sections.includes("offer_formula") && offerOutput && offerSettings && (
