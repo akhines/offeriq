@@ -208,7 +208,7 @@ export default function OfferIQ() {
     onSuccess: (data) => {
       if (!currentDealId && data.id) {
         setCurrentDealId(data.id);
-        window.history.replaceState(null, "", `/?deal=${data.id}`);
+        window.history.replaceState(null, "", `/app?deal=${data.id}`);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       toast({ description: "Deal saved successfully" });
