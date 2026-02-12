@@ -1239,6 +1239,11 @@ Generate a JSON response with this structure:
       let source: "zillow" | "redfin" | "realtor" | "other" = "other";
       let address = "";
       let imageUrl = "";
+      let price = 0;
+      let beds = 0;
+      let baths = 0;
+      let sqft = 0;
+      let soldDate = "";
 
       if (url.includes("zillow.com")) {
         source = "zillow";
@@ -1272,18 +1277,26 @@ Generate a JSON response with this structure:
 
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), 8000);
         const response = await fetch(url, {
           signal: controller.signal,
+          redirect: "follow",
           headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; bot)",
-            "Accept": "text/html",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
           },
         });
         clearTimeout(timeout);
 
+        const finalHostname = new URL(response.url).hostname.replace(/^www\./, "");
+        if (!ALLOWED_DOMAINS.some(d => finalHostname === d || finalHostname.endsWith("." + d))) {
+          return res.json({ source, address, imageUrl, price: 0, beds: 0, baths: 0, sqft: 0, soldDate: "" });
+        }
+
         if (response.ok) {
           const html = await response.text();
+
           const ogImage = html.match(/<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i)
             || html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:image["']/i);
           if (ogImage) {
@@ -1297,11 +1310,163 @@ Generate a JSON response with this structure:
               address = ogTitle[1].split("|")[0].split("-")[0].trim();
             }
           }
-        }
-      } catch {
-      }
 
-      res.json({ source, address, imageUrl });
+          const ldJsonMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+          if (ldJsonMatches) {
+            for (const block of ldJsonMatches) {
+              try {
+                const jsonContent = block.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
+                const ld = JSON.parse(jsonContent);
+                const items = Array.isArray(ld) ? ld : ld["@graph"] ? ld["@graph"] : [ld];
+                for (const item of items) {
+                  const t = item["@type"];
+                  if (t === "SingleFamilyResidence" || t === "House" || t === "Apartment"
+                    || t === "Product" || t === "RealEstateListing" || t === "Residence"
+                    || (typeof t === "string" && t.includes("Residence"))) {
+                    if (!address && item.address) {
+                      const a = typeof item.address === "string" ? item.address : item.address.streetAddress;
+                      if (a) address = a;
+                    }
+                    if (!sqft && item.floorSize) {
+                      const fs = typeof item.floorSize === "object" ? item.floorSize.value : item.floorSize;
+                      const parsed = parseInt(String(fs).replace(/[^0-9]/g, ""), 10);
+                      if (parsed > 0) sqft = parsed;
+                    }
+                    if (!beds && item.numberOfRooms) {
+                      const parsed = parseInt(String(item.numberOfRooms), 10);
+                      if (parsed > 0) beds = parsed;
+                    }
+                    if (!beds && item.numberOfBedrooms) {
+                      const parsed = parseInt(String(item.numberOfBedrooms), 10);
+                      if (parsed > 0) beds = parsed;
+                    }
+                    if (!baths && item.numberOfBathroomsTotal) {
+                      const parsed = parseFloat(String(item.numberOfBathroomsTotal));
+                      if (parsed > 0) baths = parsed;
+                    }
+                    if (!soldDate) {
+                      const dateFields = [item.datePosted, item.dateSold, item.lastSoldDate, item.closeDate, item.datePublished, item.dateModified];
+                      for (const df of dateFields) {
+                        if (df && typeof df === "string") {
+                          const d = new Date(df);
+                          if (!isNaN(d.getTime())) {
+                            soldDate = d.toISOString().split("T")[0];
+                            break;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  if (item["@type"] === "Offer" || item.offers) {
+                    const offer = item["@type"] === "Offer" ? item : (Array.isArray(item.offers) ? item.offers[0] : item.offers);
+                    if (offer && offer.price && !price) {
+                      const p = parseInt(String(offer.price).replace(/[^0-9]/g, ""), 10);
+                      if (p > 0) price = p;
+                    }
+                  }
+                  if (item.offers && !price) {
+                    const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+                    if (offer && offer.price) {
+                      const p = parseInt(String(offer.price).replace(/[^0-9]/g, ""), 10);
+                      if (p > 0) price = p;
+                    }
+                  }
+                }
+              } catch {}
+            }
+          }
+
+          if (!price) {
+            const pricePatterns = [
+              /<span[^>]*data-testid=["'](?:price|home-details-price)["'][^>]*>\s*\$?([\d,]+)/i,
+              /<span[^>]*class=["'][^"']*(?:price|Price|listing-price)[^"']*["'][^>]*>\s*\$?([\d,]+)/i,
+              /<meta\s+(?:property|name)=["'](?:product:price:amount|og:price:amount)["']\s+content=["']([^"']+)["']/i,
+              /<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["'](?:product:price:amount|og:price:amount)["']/i,
+            ];
+            for (const pat of pricePatterns) {
+              const m = html.match(pat);
+              if (m) {
+                const p = parseInt(m[1].replace(/[^0-9]/g, ""), 10);
+                if (p > 1000) { price = p; break; }
+              }
+            }
+          }
+
+          if (!beds || !baths || !sqft) {
+            const descMatch = html.match(/<meta\s+(?:property|name)=["']og:description["']\s+content=["']([^"']+)["']/i)
+              || html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:description["']/i)
+              || html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+            if (descMatch) {
+              const desc = descMatch[1];
+              if (!beds) {
+                const bedMatch = desc.match(/(\d+)\s*(?:bd|bed|bedroom)/i);
+                if (bedMatch) beds = parseInt(bedMatch[1], 10);
+              }
+              if (!baths) {
+                const bathMatch = desc.match(/([\d.]+)\s*(?:ba|bath|bathroom)/i);
+                if (bathMatch) baths = parseFloat(bathMatch[1]);
+              }
+              if (!sqft) {
+                const sqftMatch = desc.match(/([\d,]+)\s*(?:sq\s*ft|sqft|square\s*f)/i);
+                if (sqftMatch) sqft = parseInt(sqftMatch[1].replace(/,/g, ""), 10);
+              }
+            }
+          }
+
+          if (!beds || !baths || !sqft) {
+            const factPatterns = [
+              { field: "beds" as const, patterns: [/(\d+)\s*(?:beds?|bedrooms?|bd)\b/gi] },
+              { field: "baths" as const, patterns: [/([\d.]+)\s*(?:baths?|bathrooms?|ba)\b/gi] },
+              { field: "sqft" as const, patterns: [/([\d,]+)\s*(?:sq\.?\s*ft|sqft|square\s*feet)/gi] },
+            ];
+            for (const { field, patterns } of factPatterns) {
+              if ((field === "beds" && beds) || (field === "baths" && baths) || (field === "sqft" && sqft)) continue;
+              for (const pat of patterns) {
+                const m = pat.exec(html);
+                if (m) {
+                  const val = field === "baths" ? parseFloat(m[1]) : parseInt(m[1].replace(/,/g, ""), 10);
+                  if (val > 0) {
+                    if (field === "beds") beds = val;
+                    else if (field === "baths") baths = val;
+                    else if (field === "sqft") sqft = val;
+                  }
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!price) {
+            const titleDesc = (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || "") +
+              " " + (html.match(/<meta\s+(?:property|name)=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] || "");
+            const priceM = titleDesc.match(/\$([\d,]+(?:\.\d+)?)/);
+            if (priceM) {
+              const p = parseInt(priceM[1].replace(/[^0-9]/g, ""), 10);
+              if (p > 1000) price = p;
+            }
+          }
+
+          if (!soldDate) {
+            const soldPatterns = [
+              /sold\s+(?:on\s+)?(\w+\s+\d{1,2},?\s+\d{4})/i,
+              /(?:sold|closed|sale)\s*(?:date|price)?[:\s]+(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+              /(?:sold|closed)\s*(?:date|price)?[:\s]+(\d{4}-\d{2}-\d{2})/i,
+            ];
+            for (const pat of soldPatterns) {
+              const m = html.match(pat);
+              if (m) {
+                const d = new Date(m[1]);
+                if (!isNaN(d.getTime())) {
+                  soldDate = d.toISOString().split("T")[0];
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch {}
+
+      res.json({ source, address, imageUrl, price, beds, baths, sqft, soldDate });
     } catch (error) {
       console.error("Parse listing URL error:", error);
       res.status(500).json({ error: "Failed to parse listing URL" });

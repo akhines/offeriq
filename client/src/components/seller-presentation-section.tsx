@@ -177,6 +177,11 @@ export function SellerPresentationSection({
             source: data.source || detectSource(url),
             address: data.address || currentComps[index].address,
             imageUrl: data.imageUrl || currentComps[index].imageUrl,
+            price: data.price || currentComps[index].price,
+            beds: data.beds || currentComps[index].beds,
+            baths: data.baths || currentComps[index].baths,
+            sqft: data.sqft || currentComps[index].sqft,
+            soldDate: data.soldDate || currentComps[index].soldDate,
           };
           onChange({ ...latest, sellerComps: currentComps });
         }
@@ -511,6 +516,9 @@ export function SellerPresentationSection({
                   <div className="space-y-2">
                     <Label className="text-xs flex items-center gap-1">
                       <LinkIcon className="h-3 w-3" /> Listing URL
+                      <span className="text-muted-foreground font-normal ml-1">
+                        (details auto-fill from link)
+                      </span>
                     </Label>
                     <div className="flex gap-2">
                       <Input
@@ -521,11 +529,12 @@ export function SellerPresentationSection({
                         data-testid={`input-comp-url-${index}`}
                       />
                       {parsingIndex === index && (
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-1">
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">Fetching...</span>
                         </div>
                       )}
-                      {comp.url && (
+                      {comp.url && parsingIndex !== index && (
                         <Button
                           size="icon"
                           variant="ghost"
