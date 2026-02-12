@@ -285,6 +285,7 @@ export default function SavedDeals() {
         closingTimeline: sellerPres?.closingTimeline || null,
         earnestMoneyDeposit: sellerPres?.earnestMoneyDeposit || null,
         additionalTerms: sellerPres?.additionalTerms || null,
+        sellerComps: sellerPres?.sellerComps?.filter((c: any) => c.address) || null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {

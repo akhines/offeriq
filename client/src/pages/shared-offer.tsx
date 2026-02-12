@@ -31,7 +31,7 @@ import {
   Globe,
   Clock,
   MessageCircle,
-  FileText as FileTextIcon,
+  StickyNote,
 } from "lucide-react";
 import type { OfferBenefit } from "@/components/share-offer-dialog";
 import type {
@@ -44,6 +44,7 @@ import type {
   CompsData,
   ComparableSale,
   UserCompsState,
+  SellerComp,
 } from "@/types";
 
 interface DealSnapshot {
@@ -66,6 +67,7 @@ interface DealSnapshot {
   earnestMoneyDeposit?: string | null;
   additionalTerms?: string | null;
   customOfferPrice?: number | null;
+  sellerComps?: SellerComp[] | null;
 }
 
 interface SharedOfferData {
@@ -228,6 +230,110 @@ function OfferBenefitsSection({ benefits }: { benefits: OfferBenefit[] }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold" data-testid={`benefit-title-${i}`}>{benefit.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed" data-testid={`benefit-desc-${i}`}>{benefit.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function getSourceLabel(source: string): string {
+  switch (source) {
+    case "zillow": return "Zillow";
+    case "redfin": return "Redfin";
+    case "realtor": return "Realtor.com";
+    default: return "Listing";
+  }
+}
+
+function SellerCompsSection({ comps }: { comps: SellerComp[] }) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Home className="h-5 w-5 text-primary" />
+          Comparable Properties
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {comps.map((comp, i) => (
+            <div
+              key={i}
+              className="rounded-md border overflow-hidden"
+              data-testid={`seller-comp-card-${i}`}
+            >
+              {comp.imageUrl && (
+                <div className="h-40 bg-muted overflow-hidden">
+                  <img
+                    src={comp.imageUrl}
+                    alt={comp.address}
+                    className="w-full h-full object-cover"
+                    onError={(e) => (e.currentTarget.style.display = "none")}
+                    data-testid={`seller-comp-image-${i}`}
+                  />
+                </div>
+              )}
+              <div className="p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold leading-tight" data-testid={`seller-comp-address-${i}`}>
+                      {comp.address}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {comp.beds > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                          <BedDouble className="h-3 w-3" /> {comp.beds}bd
+                        </span>
+                      )}
+                      {comp.baths > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                          <Bath className="h-3 w-3" /> {comp.baths}ba
+                        </span>
+                      )}
+                      {comp.sqft > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                          <Ruler className="h-3 w-3" /> {comp.sqft.toLocaleString()} sqft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {comp.price > 0 && (
+                    <p className="text-sm font-bold text-primary whitespace-nowrap" data-testid={`seller-comp-price-${i}`}>
+                      ${comp.price.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {comp.soldDate && (
+                  <p className="text-xs text-muted-foreground">
+                    Sold: {new Date(comp.soldDate).toLocaleDateString()}
+                  </p>
+                )}
+
+                {comp.notes && (
+                  <div className="flex gap-2 p-2 rounded bg-muted/40">
+                    <StickyNote className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground leading-relaxed" data-testid={`seller-comp-notes-${i}`}>
+                      {comp.notes}
+                    </p>
+                  </div>
+                )}
+
+                {comp.url && (
+                  <a
+                    href={comp.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-primary font-medium"
+                    data-testid={`seller-comp-link-${i}`}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View on {getSourceLabel(comp.source)}
+                  </a>
+                )}
               </div>
             </div>
           ))}
@@ -735,11 +841,15 @@ export default function SharedOfferPage() {
           }
         })}
 
+        {dealSnapshot.sellerComps && dealSnapshot.sellerComps.length > 0 && (
+          <SellerCompsSection comps={dealSnapshot.sellerComps} />
+        )}
+
         {(dealSnapshot.closingTimeline || dealSnapshot.earnestMoneyDeposit || dealSnapshot.additionalTerms) && (
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <FileTextIcon className="h-5 w-5 text-primary" />
+                <FileText className="h-5 w-5 text-primary" />
                 Deal Terms
               </CardTitle>
             </CardHeader>

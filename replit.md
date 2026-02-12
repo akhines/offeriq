@@ -73,6 +73,7 @@ Preferred communication style: Simple, everyday language.
 - `client/src/components/comps-map.tsx` - Google Maps view showing comp locations relative to subject property
 - `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder
 - `client/src/components/offer-presentation-section.tsx` - AI presentation generator
+- `client/src/components/seller-presentation-section.tsx` - Seller-facing customizations (benefits, comps, company info, deal terms)
 
 ### Build Configuration
 - Development: `tsx server/index.ts` with Vite middleware for HMR
@@ -129,6 +130,15 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - At 100% confidence, only user comps are used; at 0%, only API comps
 - Sortable table, statistics (Avg $/SqFt, Avg Price, Your ARV)
 - Data persisted to localStorage
+
+### Seller Comps (Seller Presentation Tab)
+- Users can add up to 5 comparable properties with Zillow/Redfin/Realtor links
+- Server endpoint `POST /api/parse-listing-url` parses address from URL slug and attempts OG meta fetch for preview image
+- Domain-restricted to zillow.com, redfin.com, realtor.com only (SSRF prevention)
+- Each comp: URL, auto-parsed address, price, sqft, beds, baths, sold date, image URL, personal notes
+- Stored as `sellerComps` array in SellerPresentationSettings, persisted with deal data
+- Shared to seller page: comp cards with property details, photos, notes, and "View on Zillow/Redfin" buttons
+- Debounced URL parsing (600ms) with stale-state protection via settingsRef
 
 ### AI Ethical Guardrails
 - DISC profiles presented as hypotheses, not diagnoses

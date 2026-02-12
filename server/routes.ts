@@ -1217,5 +1217,96 @@ Generate a JSON response with this structure:
     }
   });
 
+  app.post("/api/parse-listing-url", async (req, res) => {
+    try {
+      const { url } = req.body;
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const ALLOWED_DOMAINS = ["zillow.com", "redfin.com", "realtor.com"];
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return res.status(400).json({ error: "Invalid URL" });
+      }
+      const hostname = parsedUrl.hostname.replace(/^www\./, "");
+      if (!ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith("." + d))) {
+        return res.json({ source: "other", address: "", imageUrl: "" });
+      }
+
+      let source: "zillow" | "redfin" | "realtor" | "other" = "other";
+      let address = "";
+      let imageUrl = "";
+
+      if (url.includes("zillow.com")) {
+        source = "zillow";
+        const match = url.match(/\/(?:homedetails|homes|b)\/([^/]+)/);
+        if (match) {
+          address = match[1]
+            .replace(/-/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+            .replace(/\s\d{5,}$/, "")
+            .replace(/\s\d+Zpid$/, "");
+        }
+      } else if (url.includes("redfin.com")) {
+        source = "redfin";
+        const match = url.match(/\/(?:home|stingless)\/(\d+)/) || url.match(/\/([\w-]+?)(?:\/home\/\d+)?$/);
+        const addrMatch = url.match(/\/(?:[A-Z]{2})\/([\w-]+?)\//i) || url.match(/\/([^/]+?)\/home\/\d+$/);
+        if (addrMatch) {
+          address = addrMatch[1]
+            .replace(/-/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+      } else if (url.includes("realtor.com")) {
+        source = "realtor";
+        const match = url.match(/\/realestateandhomes-detail\/([^/]+)/);
+        if (match) {
+          address = match[1]
+            .replace(/_/g, " ")
+            .replace(/-/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; bot)",
+            "Accept": "text/html",
+          },
+        });
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          const html = await response.text();
+          const ogImage = html.match(/<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i)
+            || html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:image["']/i);
+          if (ogImage) {
+            imageUrl = ogImage[1];
+          }
+
+          if (!address) {
+            const ogTitle = html.match(/<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i)
+              || html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:title["']/i);
+            if (ogTitle) {
+              address = ogTitle[1].split("|")[0].split("-")[0].trim();
+            }
+          }
+        }
+      } catch {
+      }
+
+      res.json({ source, address, imageUrl });
+    } catch (error) {
+      console.error("Parse listing URL error:", error);
+      res.status(500).json({ error: "Failed to parse listing URL" });
+    }
+  });
+
   return httpServer;
 }

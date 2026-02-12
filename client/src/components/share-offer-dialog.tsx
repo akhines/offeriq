@@ -243,6 +243,7 @@ export function ShareOfferDialog({
         earnestMoneyDeposit: sellerPresentation?.earnestMoneyDeposit || null,
         additionalTerms: sellerPresentation?.additionalTerms || null,
         customOfferPrice: sellerPresentation?.useCustomOfferPrice ? sellerPresentation.customOfferPrice : null,
+        sellerComps: sellerPresentation?.sellerComps?.filter(c => c.address) || null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {

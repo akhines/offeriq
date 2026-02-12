@@ -134,6 +134,19 @@ export interface PresentationOutput {
   followUpCadence: string;
 }
 
+export interface SellerComp {
+  url: string;
+  source: "zillow" | "redfin" | "realtor" | "other";
+  address: string;
+  price: number;
+  sqft: number;
+  beds: number;
+  baths: number;
+  imageUrl: string;
+  notes: string;
+  soldDate: string;
+}
+
 export interface SellerBenefit {
   title: string;
   description: string;
@@ -143,6 +156,7 @@ export interface SellerPresentationSettings {
   customOfferPrice: number;
   useCustomOfferPrice: boolean;
   benefits: SellerBenefit[];
+  sellerComps: SellerComp[];
   personalMessage: string;
   companyName: string;
   companyPhone: string;
@@ -172,6 +186,7 @@ export const DEFAULT_SELLER_PRESENTATION: SellerPresentationSettings = {
   customOfferPrice: 0,
   useCustomOfferPrice: false,
   benefits: DEFAULT_SELLER_BENEFITS.map(b => ({ ...b })),
+  sellerComps: [],
   personalMessage: "",
   companyName: "",
   companyPhone: "",

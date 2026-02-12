@@ -22,19 +22,51 @@ import {
   MessageSquare,
   Eye,
   RotateCcw,
+  Link as LinkIcon,
+  Loader2,
+  Home,
+  StickyNote,
+  ExternalLink,
+  BedDouble,
+  Bath,
+  Ruler,
+  CalendarDays,
+  ImageIcon,
 } from "lucide-react";
 import type {
   SellerPresentationSettings,
   SellerBenefit,
+  SellerComp,
   OfferOutput,
 } from "@/types";
 import { DEFAULT_SELLER_BENEFITS } from "@/types";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SellerPresentationSectionProps {
   settings: SellerPresentationSettings;
   offerOutput: OfferOutput | null;
   propertyAddress: string;
   onChange: (settings: SellerPresentationSettings) => void;
+}
+
+const EMPTY_COMP: SellerComp = {
+  url: "",
+  source: "other",
+  address: "",
+  price: 0,
+  sqft: 0,
+  beds: 0,
+  baths: 0,
+  imageUrl: "",
+  notes: "",
+  soldDate: "",
+};
+
+function detectSource(url: string): SellerComp["source"] {
+  if (url.includes("zillow.com")) return "zillow";
+  if (url.includes("redfin.com")) return "redfin";
+  if (url.includes("realtor.com")) return "realtor";
+  return "other";
 }
 
 export function SellerPresentationSection({
@@ -45,6 +77,7 @@ export function SellerPresentationSection({
 }: SellerPresentationSectionProps) {
   const dragItemRef = useRef<number | null>(null);
   const dragOverRef = useRef<number | null>(null);
+  const [parsingIndex, setParsingIndex] = useState<number | null>(null);
 
   const displayPrice = settings.useCustomOfferPrice && settings.customOfferPrice > 0
     ? settings.customOfferPrice
@@ -98,6 +131,61 @@ export function SellerPresentationSection({
     dragItemRef.current = null;
     dragOverRef.current = null;
   }, [settings.benefits, updateField]);
+
+  const comps = settings.sellerComps || [];
+
+  const addComp = useCallback(() => {
+    if (comps.length >= 5) return;
+    updateField("sellerComps", [...comps, { ...EMPTY_COMP }]);
+  }, [comps, updateField]);
+
+  const removeComp = useCallback((index: number) => {
+    updateField("sellerComps", comps.filter((_, i) => i !== index));
+  }, [comps, updateField]);
+
+  const updateComp = useCallback((index: number, field: keyof SellerComp, value: string | number) => {
+    const updated = comps.map((c, i) =>
+      i === index ? { ...c, [field]: value } : c
+    );
+    updateField("sellerComps", updated);
+  }, [comps, updateField]);
+
+  const parseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  const handleCompUrlChange = useCallback((index: number, url: string) => {
+    const updated = (settings.sellerComps || []).map((c, i) =>
+      i === index ? { ...c, url, source: detectSource(url) } : c
+    );
+    updateField("sellerComps", updated);
+
+    if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
+
+    if (!url.startsWith("http")) return;
+
+    parseTimerRef.current = setTimeout(async () => {
+      setParsingIndex(index);
+      try {
+        const res = await apiRequest("POST", "/api/parse-listing-url", { url });
+        const data = await res.json();
+        const latest = settingsRef.current;
+        const currentComps = [...(latest.sellerComps || [])];
+        if (currentComps[index]) {
+          currentComps[index] = {
+            ...currentComps[index],
+            source: data.source || detectSource(url),
+            address: data.address || currentComps[index].address,
+            imageUrl: data.imageUrl || currentComps[index].imageUrl,
+          };
+          onChange({ ...latest, sellerComps: currentComps });
+        }
+      } catch {
+      } finally {
+        setParsingIndex(null);
+      }
+    }, 600);
+  }, [settings.sellerComps, updateField, onChange]);
 
   return (
     <div className="space-y-6">
@@ -384,6 +472,215 @@ export function SellerPresentationSection({
 
           <Card>
             <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Home className="h-4 w-4 text-primary" />
+                    Seller Comps
+                  </CardTitle>
+                  <CardDescription>
+                    Paste Zillow/Redfin/Realtor links to show comparable properties to the seller
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary" className="text-xs">{comps.length}/5</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {comps.map((comp, index) => (
+                <div
+                  key={index}
+                  className="p-3 rounded-md border bg-muted/20 space-y-3"
+                  data-testid={`seller-comp-${index}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      Comp {index + 1}
+                      {comp.source !== "other" && ` · ${comp.source.charAt(0).toUpperCase() + comp.source.slice(1)}`}
+                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeComp(index)}
+                      className="text-muted-foreground flex-shrink-0"
+                      data-testid={`button-remove-comp-${index}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs flex items-center gap-1">
+                      <LinkIcon className="h-3 w-3" /> Listing URL
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Paste Zillow, Redfin, or Realtor link..."
+                        value={comp.url}
+                        onChange={(e) => handleCompUrlChange(index, e.target.value)}
+                        className="flex-1 text-sm"
+                        data-testid={`input-comp-url-${index}`}
+                      />
+                      {parsingIndex === index && (
+                        <div className="flex items-center">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      {comp.url && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => window.open(comp.url, "_blank")}
+                          data-testid={`button-open-comp-${index}`}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Address</Label>
+                    <Input
+                      placeholder="123 Main St, City, ST 12345"
+                      value={comp.address}
+                      onChange={(e) => updateComp(index, "address", e.target.value)}
+                      className="text-sm"
+                      data-testid={`input-comp-address-${index}`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" /> Price
+                      </Label>
+                      <Input
+                        type="number"
+                        placeholder="Price"
+                        value={comp.price || ""}
+                        onChange={(e) => updateComp(index, "price", Number(e.target.value) || 0)}
+                        className="text-sm"
+                        data-testid={`input-comp-price-${index}`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <Ruler className="h-3 w-3" /> SqFt
+                      </Label>
+                      <Input
+                        type="number"
+                        placeholder="SqFt"
+                        value={comp.sqft || ""}
+                        onChange={(e) => updateComp(index, "sqft", Number(e.target.value) || 0)}
+                        className="text-sm"
+                        data-testid={`input-comp-sqft-${index}`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <BedDouble className="h-3 w-3" /> Beds
+                      </Label>
+                      <Input
+                        type="number"
+                        placeholder="Beds"
+                        value={comp.beds || ""}
+                        onChange={(e) => updateComp(index, "beds", Number(e.target.value) || 0)}
+                        className="text-sm"
+                        data-testid={`input-comp-beds-${index}`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <Bath className="h-3 w-3" /> Baths
+                      </Label>
+                      <Input
+                        type="number"
+                        placeholder="Baths"
+                        value={comp.baths || ""}
+                        onChange={(e) => updateComp(index, "baths", Number(e.target.value) || 0)}
+                        className="text-sm"
+                        data-testid={`input-comp-baths-${index}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" /> Sold Date
+                      </Label>
+                      <Input
+                        type="date"
+                        value={comp.soldDate}
+                        onChange={(e) => updateComp(index, "soldDate", e.target.value)}
+                        className="text-sm"
+                        data-testid={`input-comp-sold-date-${index}`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <ImageIcon className="h-3 w-3" /> Image URL
+                      </Label>
+                      <Input
+                        placeholder="Auto-detected or paste image URL"
+                        value={comp.imageUrl}
+                        onChange={(e) => updateComp(index, "imageUrl", e.target.value)}
+                        className="text-sm"
+                        data-testid={`input-comp-image-${index}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs flex items-center gap-1">
+                      <StickyNote className="h-3 w-3" /> Notes
+                    </Label>
+                    <Textarea
+                      placeholder="Your notes about this property (shown to seller)..."
+                      value={comp.notes}
+                      onChange={(e) => updateComp(index, "notes", e.target.value)}
+                      className="resize-none text-sm"
+                      rows={2}
+                      data-testid={`input-comp-notes-${index}`}
+                    />
+                  </div>
+
+                  {comp.imageUrl && (
+                    <div className="rounded-md overflow-hidden border h-32 bg-muted">
+                      <img
+                        src={comp.imageUrl}
+                        alt={comp.address || `Comp ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => (e.currentTarget.style.display = "none")}
+                        data-testid={`img-comp-preview-${index}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {comps.length < 5 && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={addComp}
+                  data-testid="button-add-seller-comp"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Comparable Property
+                </Button>
+              )}
+
+              {comps.length === 0 && (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">No comps added yet. Add up to 5 comparable properties to share with the seller.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-primary" />
                 Personal Message
@@ -438,6 +735,10 @@ export function SellerPresentationSection({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Benefits</span>
                   <span>{settings.benefits.filter(b => b.title).length} configured</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Seller Comps</span>
+                  <span>{comps.filter(c => c.address).length} properties</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Company</span>
