@@ -261,6 +261,8 @@ export default function SavedDeals() {
       const compsData = (deal as any).compsData || null;
       const userCompsData = (deal as any).userComps || null;
 
+      const sellerPres = underwritingData?.sellerPresentation || null;
+
       const dealSnapshot = {
         property: underwritingData?.property || { address: deal.propertyAddress },
         avmBaselines: underwritingData?.avmBaselines || {},
@@ -270,7 +272,19 @@ export default function SavedDeals() {
         presentationOutput: presentationData?.presentationOutput || null,
         compsData,
         userComps: userCompsData,
-        offerBenefits: sellerSelectedSet.has("offer_benefits") ? DEFAULT_OFFER_BENEFITS : null,
+        offerBenefits: sellerSelectedSet.has("offer_benefits")
+          ? (sellerPres?.benefits || DEFAULT_OFFER_BENEFITS)
+          : null,
+        personalMessage: sellerPres?.personalMessage || null,
+        customOfferPrice: sellerPres?.useCustomOfferPrice ? sellerPres?.customOfferPrice : null,
+        companyName: sellerPres?.companyName || null,
+        companyPhone: sellerPres?.companyPhone || null,
+        companyEmail: sellerPres?.companyEmail || null,
+        companyWebsite: sellerPres?.companyWebsite || null,
+        companyLogoUrl: sellerPres?.companyLogoUrl || null,
+        closingTimeline: sellerPres?.closingTimeline || null,
+        earnestMoneyDeposit: sellerPres?.earnestMoneyDeposit || null,
+        additionalTerms: sellerPres?.additionalTerms || null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {

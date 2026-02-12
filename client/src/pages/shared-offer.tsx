@@ -26,6 +26,12 @@ import {
   DollarSign,
   Gift,
   CheckCircle2,
+  Phone,
+  Mail,
+  Globe,
+  Clock,
+  MessageCircle,
+  FileText as FileTextIcon,
 } from "lucide-react";
 import type { OfferBenefit } from "@/components/share-offer-dialog";
 import type {
@@ -52,6 +58,14 @@ interface DealSnapshot {
   offerBenefits?: OfferBenefit[] | null;
   companyLogoPath?: string | null;
   companyName?: string | null;
+  companyPhone?: string | null;
+  companyEmail?: string | null;
+  companyWebsite?: string | null;
+  personalMessage?: string | null;
+  closingTimeline?: string | null;
+  earnestMoneyDeposit?: string | null;
+  additionalTerms?: string | null;
+  customOfferPrice?: number | null;
 }
 
 interface SharedOfferData {
@@ -661,6 +675,41 @@ export default function SharedOfferPage() {
           </p>
         </div>
 
+        {dealSnapshot.personalMessage && (
+          <Card>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex gap-3">
+                <MessageCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium mb-1">A message from {companyName || "your buyer"}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap" data-testid="text-personal-message">
+                    {dealSnapshot.personalMessage}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {dealSnapshot.customOfferPrice && dealSnapshot.customOfferPrice > 0 && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-5 pb-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-1">Our Offer for Your Property</p>
+                <p className="text-3xl font-bold text-primary" data-testid="text-custom-offer-price">
+                  ${dealSnapshot.customOfferPrice.toLocaleString()}
+                </p>
+                {dealSnapshot.closingTimeline && (
+                  <div className="flex items-center justify-center gap-1.5 mt-2 text-sm text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Closing in {dealSnapshot.closingTimeline}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {sections.map((sectionId: string) => {
           switch (sectionId) {
             case "property_details":
@@ -685,6 +734,90 @@ export default function SharedOfferPage() {
               return null;
           }
         })}
+
+        {(dealSnapshot.closingTimeline || dealSnapshot.earnestMoneyDeposit || dealSnapshot.additionalTerms) && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileTextIcon className="h-5 w-5 text-primary" />
+                Deal Terms
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {dealSnapshot.closingTimeline && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" /> Closing Timeline
+                    </span>
+                    <span className="font-medium" data-testid="text-closing-timeline">{dealSnapshot.closingTimeline}</span>
+                  </div>
+                )}
+                {dealSnapshot.earnestMoneyDeposit && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5" /> Earnest Money
+                    </span>
+                    <span className="font-medium" data-testid="text-earnest-money">{dealSnapshot.earnestMoneyDeposit}</span>
+                  </div>
+                )}
+                {dealSnapshot.additionalTerms && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-xs text-muted-foreground mb-1">Additional Terms</p>
+                    <p className="text-sm whitespace-pre-wrap" data-testid="text-additional-terms">{dealSnapshot.additionalTerms}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {(dealSnapshot.companyPhone || dealSnapshot.companyEmail || dealSnapshot.companyWebsite) && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Phone className="h-5 w-5 text-primary" />
+                Contact Us
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {dealSnapshot.companyPhone && (
+                  <a
+                    href={`tel:${dealSnapshot.companyPhone}`}
+                    className="flex items-center gap-2 text-sm text-primary"
+                    data-testid="link-company-phone"
+                  >
+                    <Phone className="h-4 w-4" />
+                    {dealSnapshot.companyPhone}
+                  </a>
+                )}
+                {dealSnapshot.companyEmail && (
+                  <a
+                    href={`mailto:${dealSnapshot.companyEmail}`}
+                    className="flex items-center gap-2 text-sm text-primary"
+                    data-testid="link-company-email"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {dealSnapshot.companyEmail}
+                  </a>
+                )}
+                {dealSnapshot.companyWebsite && (
+                  <a
+                    href={dealSnapshot.companyWebsite.startsWith("http") ? dealSnapshot.companyWebsite : `https://${dealSnapshot.companyWebsite}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary"
+                    data-testid="link-company-website"
+                  >
+                    <Globe className="h-4 w-4" />
+                    {dealSnapshot.companyWebsite}
+                  </a>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="text-center pt-6 pb-8">
           <Separator className="mb-6" />

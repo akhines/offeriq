@@ -37,6 +37,7 @@ import type {
   OfferOutput,
   OfferSettings,
   PresentationOutput,
+  SellerPresentationSettings,
 } from "@/types";
 
 export const SHAREABLE_SECTIONS = [
@@ -89,6 +90,7 @@ interface ShareOfferDialogProps {
   offerOutput: OfferOutput | null;
   offerSettings: OfferSettings;
   presentationOutput: PresentationOutput | null;
+  sellerPresentation?: SellerPresentationSettings;
   compsData?: any;
   userComps?: any;
   isAuthenticated: boolean;
@@ -103,6 +105,7 @@ export function ShareOfferDialog({
   offerOutput,
   offerSettings,
   presentationOutput,
+  sellerPresentation,
   compsData,
   userComps,
   isAuthenticated,
@@ -119,10 +122,6 @@ export function ShareOfferDialog({
   const [myLinks, setMyLinks] = useState<SharedLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [offerBenefits, setOfferBenefits] = useState<OfferBenefit[]>(() =>
-    DEFAULT_OFFER_BENEFITS.map((b) => ({ ...b }))
-  );
-  const [editingBenefitIndex, setEditingBenefitIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
   const selectedSections = new Set<SectionId>(orderedSections);
@@ -207,9 +206,6 @@ export function ShareOfferDialog({
     }
   };
 
-  const updateBenefit = (index: number, field: "title" | "description", value: string) => {
-    setOfferBenefits((prev) => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
-  };
 
   const handleCreate = async () => {
     if (!isAuthenticated) {
@@ -224,6 +220,10 @@ export function ShareOfferDialog({
 
     setIsCreating(true);
     try {
+      const benefits = sellerPresentation?.benefits?.length
+        ? sellerPresentation.benefits
+        : DEFAULT_OFFER_BENEFITS;
+
       const dealSnapshot = {
         property,
         avmBaselines,
@@ -233,7 +233,16 @@ export function ShareOfferDialog({
         presentationOutput,
         compsData: compsData || null,
         userComps: userComps || null,
-        offerBenefits: selectedSections.has("offer_benefits") ? offerBenefits : null,
+        offerBenefits: selectedSections.has("offer_benefits") ? benefits : null,
+        companyName: sellerPresentation?.companyName || null,
+        companyPhone: sellerPresentation?.companyPhone || null,
+        companyEmail: sellerPresentation?.companyEmail || null,
+        companyWebsite: sellerPresentation?.companyWebsite || null,
+        personalMessage: sellerPresentation?.personalMessage || null,
+        closingTimeline: sellerPresentation?.closingTimeline || null,
+        earnestMoneyDeposit: sellerPresentation?.earnestMoneyDeposit || null,
+        additionalTerms: sellerPresentation?.additionalTerms || null,
+        customOfferPrice: sellerPresentation?.useCustomOfferPrice ? sellerPresentation.customOfferPrice : null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {
@@ -481,67 +490,15 @@ export function ShareOfferDialog({
               </div>
             </div>
 
-            {selectedSections.has("offer_benefits") && (
+            {selectedSections.has("offer_benefits") && sellerPresentation?.benefits && sellerPresentation.benefits.length > 0 && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Offer Benefits</Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setOfferBenefits(DEFAULT_OFFER_BENEFITS.map((b) => ({ ...b })))}
-                    className="text-xs h-7"
-                    data-testid="button-reset-benefits"
-                  >
-                    Reset to defaults
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {offerBenefits.map((benefit, i) => (
-                    <div
-                      key={i}
-                      className="p-2.5 rounded-md border bg-muted/20 space-y-1.5"
-                      data-testid={`benefit-editor-${i}`}
-                    >
-                      {editingBenefitIndex === i ? (
-                        <>
-                          <Input
-                            value={benefit.title}
-                            onChange={(e) => updateBenefit(i, "title", e.target.value)}
-                            className="text-sm font-medium"
-                            placeholder="Benefit title"
-                            data-testid={`input-benefit-title-${i}`}
-                          />
-                          <Textarea
-                            value={benefit.description}
-                            onChange={(e) => updateBenefit(i, "description", e.target.value)}
-                            className="text-xs resize-none"
-                            rows={2}
-                            placeholder="Describe this benefit..."
-                            data-testid={`input-benefit-desc-${i}`}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingBenefitIndex(null)}
-                            className="text-xs h-7"
-                            data-testid={`button-done-editing-${i}`}
-                          >
-                            <Check className="h-3 w-3 mr-1" /> Done
-                          </Button>
-                        </>
-                      ) : (
-                        <div
-                          className="cursor-pointer group"
-                          onClick={() => setEditingBenefitIndex(i)}
-                          data-testid={`benefit-preview-${i}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium">{benefit.title}</p>
-                            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{benefit.description}</p>
-                        </div>
-                      )}
+                <Label className="text-sm font-medium">Offer Benefits Preview</Label>
+                <p className="text-xs text-muted-foreground">Edit benefits in the Seller Presentation tab</p>
+                <div className="space-y-1.5">
+                  {sellerPresentation.benefits.map((benefit, i) => (
+                    <div key={i} className="p-2 rounded-md border bg-muted/20">
+                      <p className="text-sm font-medium">{benefit.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{benefit.description}</p>
                     </div>
                   ))}
                 </div>

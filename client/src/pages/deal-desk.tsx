@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UnderwritingSection } from "@/components/underwriting-section";
 import { OfferCalcSection } from "@/components/offer-calc-section";
 import { OfferPresentationSection } from "@/components/offer-presentation-section";
+import { SellerPresentationSection } from "@/components/seller-presentation-section";
 import { calculateUnderwriting } from "@/lib/engines/underwriting";
 import { calculateOfferOutput } from "@/lib/engines/offer-calculation";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ import {
   LogOut,
   LogIn,
   Settings,
+  Eye,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -34,13 +36,14 @@ import type {
   AVMBaselines,
   OfferSettings,
   PresentationInput,
+  SellerPresentationSettings,
   UnderwritingOutput,
   OfferOutput,
   PresentationOutput,
   DealState,
   UserCompsState,
 } from "@/types";
-import { DEFAULT_OFFER_SETTINGS } from "@/types";
+import { DEFAULT_OFFER_SETTINGS, DEFAULT_SELLER_PRESENTATION } from "@/types";
 
 const USER_COMPS_STORAGE_KEY = "offeriq-user-comps";
 
@@ -62,6 +65,7 @@ function getDefaultState(): DealState {
     avmBaselines: {},
     offerSettings: DEFAULT_OFFER_SETTINGS,
     presentationInput: { callNotes: [], keySellerConstraints: [] },
+    sellerPresentation: { ...DEFAULT_SELLER_PRESENTATION, benefits: DEFAULT_SELLER_PRESENTATION.benefits.map(b => ({ ...b })) },
   };
 }
 
@@ -154,6 +158,7 @@ export default function OfferIQ() {
         avmBaselines: underwritingData.avmBaselines || {},
         offerSettings: offerData.offerSettings || DEFAULT_OFFER_SETTINGS,
         presentationInput: underwritingData.presentationInput || { callNotes: [], keySellerConstraints: [] },
+        sellerPresentation: underwritingData.sellerPresentation || { ...DEFAULT_SELLER_PRESENTATION, benefits: DEFAULT_SELLER_PRESENTATION.benefits.map(b => ({ ...b })) },
       });
 
       if (underwritingData.manualAsIsEstimate !== undefined) setManualAsIsEstimate(underwritingData.manualAsIsEstimate);
@@ -180,6 +185,7 @@ export default function OfferIQ() {
           avmBaselines: state.avmBaselines,
           publicInfo: state.publicInfo,
           presentationInput: state.presentationInput,
+          sellerPresentation: state.sellerPresentation,
         },
         offerData: {
           offerOutput,
@@ -307,6 +313,10 @@ export default function OfferIQ() {
 
   const handlePresentationInputChange = useCallback((presentationInput: PresentationInput) => {
     setState((s) => ({ ...s, presentationInput }));
+  }, []);
+
+  const handleSellerPresentationChange = useCallback((sellerPresentation: SellerPresentationSettings) => {
+    setState((s) => ({ ...s, sellerPresentation }));
   }, []);
 
   const handleReset = () => {
@@ -470,6 +480,7 @@ export default function OfferIQ() {
               offerOutput={offerOutput}
               offerSettings={state.offerSettings}
               presentationOutput={presentationOutput}
+              sellerPresentation={state.sellerPresentation}
               compsData={compsData}
               userComps={userComps}
               isAuthenticated={isAuthenticated}
@@ -534,7 +545,7 @@ export default function OfferIQ() {
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <Tabs defaultValue="underwriting" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
             <TabsTrigger value="underwriting" className="gap-2" data-testid="tab-underwriting">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Underwriting</span>
@@ -545,7 +556,11 @@ export default function OfferIQ() {
             </TabsTrigger>
             <TabsTrigger value="presentation" className="gap-2" data-testid="tab-presentation">
               <Presentation className="h-4 w-4" />
-              <span className="hidden sm:inline">Presentation</span>
+              <span className="hidden sm:inline">AI Plan</span>
+            </TabsTrigger>
+            <TabsTrigger value="seller" className="gap-2" data-testid="tab-seller-presentation">
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">Seller View</span>
             </TabsTrigger>
           </TabsList>
 
@@ -596,6 +611,15 @@ export default function OfferIQ() {
               onPresentationInputChange={handlePresentationInputChange}
               onPresentationOutputChange={setPresentationOutput}
               onPdfUrlChange={setPresentationPdfUrl}
+            />
+          </TabsContent>
+
+          <TabsContent value="seller" className="mt-6">
+            <SellerPresentationSection
+              settings={state.sellerPresentation}
+              offerOutput={offerOutput}
+              propertyAddress={state.property.address || ""}
+              onChange={handleSellerPresentationChange}
             />
           </TabsContent>
         </Tabs>

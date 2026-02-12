@@ -134,6 +134,54 @@ export interface PresentationOutput {
   followUpCadence: string;
 }
 
+export interface SellerBenefit {
+  title: string;
+  description: string;
+}
+
+export interface SellerPresentationSettings {
+  customOfferPrice: number;
+  useCustomOfferPrice: boolean;
+  benefits: SellerBenefit[];
+  personalMessage: string;
+  companyName: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyWebsite: string;
+  closingTimeline: string;
+  earnestMoneyDeposit: string;
+  additionalTerms: string;
+}
+
+export const DEFAULT_SELLER_BENEFITS: SellerBenefit[] = [
+  {
+    title: "Buy As-Is",
+    description: "No repairs, cleaning, or renovations needed. We purchase your property in its current condition so you can skip the hassle and expense of fixing it up.",
+  },
+  {
+    title: "No Hidden Fees",
+    description: "Zero commissions, no closing costs on your end, and no surprise charges. The offer you accept is the amount you walk away with.",
+  },
+  {
+    title: "We Help You Move",
+    description: "We coordinate and cover moving assistance to make your transition as smooth as possible. Just pack your personal items and we handle the rest.",
+  },
+];
+
+export const DEFAULT_SELLER_PRESENTATION: SellerPresentationSettings = {
+  customOfferPrice: 0,
+  useCustomOfferPrice: false,
+  benefits: DEFAULT_SELLER_BENEFITS.map(b => ({ ...b })),
+  personalMessage: "",
+  companyName: "",
+  companyPhone: "",
+  companyEmail: "",
+  companyWebsite: "",
+  closingTimeline: "14-21 days",
+  earnestMoneyDeposit: "",
+  additionalTerms: "",
+};
+
 export interface DealState {
   property: PropertyInfo;
   seller: SellerInfo;
@@ -141,6 +189,7 @@ export interface DealState {
   avmBaselines: AVMBaselines;
   offerSettings: OfferSettings;
   presentationInput: PresentationInput;
+  sellerPresentation: SellerPresentationSettings;
   underwritingOutput?: UnderwritingOutput;
   offerOutput?: OfferOutput;
   presentationOutput?: PresentationOutput;
