@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import {
   LinkIcon,
   Gift,
   Pencil,
+  GripVertical,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -108,8 +109,8 @@ export function ShareOfferDialog({
 }: ShareOfferDialogProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<DialogView>("create");
-  const [selectedSections, setSelectedSections] = useState<Set<SectionId>>(
-    () => new Set<SectionId>(["property_details", "offer_ladder", "deal_grade"])
+  const [orderedSections, setOrderedSections] = useState<SectionId[]>(
+    () => ["property_details", "offer_ladder", "deal_grade"]
   );
   const [expiresIn, setExpiresIn] = useState("7");
   const [isCreating, setIsCreating] = useState(false);
@@ -123,6 +124,40 @@ export function ShareOfferDialog({
   );
   const [editingBenefitIndex, setEditingBenefitIndex] = useState<number | null>(null);
   const { toast } = useToast();
+
+  const selectedSections = new Set<SectionId>(orderedSections);
+
+  const dragItemRef = useRef<SectionId | null>(null);
+  const dragOverItemRef = useRef<SectionId | null>(null);
+
+  const handleDragStart = useCallback((sectionId: SectionId) => {
+    dragItemRef.current = sectionId;
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, sectionId: SectionId) => {
+    e.preventDefault();
+    dragOverItemRef.current = sectionId;
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const dragId = dragItemRef.current;
+    const dropId = dragOverItemRef.current;
+    if (!dragId || !dropId || dragId === dropId) return;
+
+    setOrderedSections(prev => {
+      const dragIdx = prev.indexOf(dragId);
+      const dropIdx = prev.indexOf(dropId);
+      if (dragIdx === -1 || dropIdx === -1) return prev;
+      const next = [...prev];
+      next.splice(dragIdx, 1);
+      next.splice(dropIdx, 0, dragId);
+      return next;
+    });
+
+    dragItemRef.current = null;
+    dragOverItemRef.current = null;
+  }, []);
 
   const fetchMyLinks = async () => {
     if (!isAuthenticated) return;
@@ -140,14 +175,12 @@ export function ShareOfferDialog({
   };
 
   const toggleSection = (id: SectionId) => {
-    setSelectedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+    setOrderedSections((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((s) => s !== id);
       } else {
-        next.add(id);
+        return [...prev, id];
       }
-      return next;
     });
   };
 
@@ -184,7 +217,7 @@ export function ShareOfferDialog({
       return;
     }
 
-    if (selectedSections.size === 0) {
+    if (orderedSections.length === 0) {
       toast({ description: "Select at least one section to share", variant: "destructive" });
       return;
     }
@@ -205,7 +238,7 @@ export function ShareOfferDialog({
 
       const res = await apiRequest("POST", "/api/shares", {
         propertyAddress: property.address || "Unknown Property",
-        sections: Array.from(selectedSections),
+        sections: orderedSections,
         dealSnapshot,
         expiresInDays: expiresIn === "never" ? null : parseInt(expiresIn),
       });
@@ -340,7 +373,7 @@ export function ShareOfferDialog({
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="secondary" className="text-xs">
-                {selectedSections.size} section{selectedSections.size !== 1 ? "s" : ""}
+                {orderedSections.length} section{orderedSections.length !== 1 ? "s" : ""}
               </Badge>
               <Badge variant="outline" className="text-xs">
                 {expiresIn === "never" ? "No expiration" : `Expires in ${expiresIn} days`}
@@ -369,45 +402,83 @@ export function ShareOfferDialog({
               Choose which sections the property owner will see when they open the link.
             </p>
 
-            <div className="space-y-1.5">
-              {SHAREABLE_SECTIONS.map((section) => {
-                const available = isSectionAvailable(section.id);
-                const selected = selectedSections.has(section.id);
-                const Icon = section.icon;
+            {orderedSections.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Selected (drag to reorder)</Label>
+                <div className="space-y-1">
+                  {orderedSections.map((sectionId) => {
+                    const section = SHAREABLE_SECTIONS.find((s) => s.id === sectionId);
+                    if (!section) return null;
+                    const Icon = section.icon;
 
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    disabled={!available}
-                    onClick={() => toggleSection(section.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
-                      !available
-                        ? "opacity-40 cursor-not-allowed"
-                        : selected
-                          ? "bg-primary/10 border border-primary/30"
+                    return (
+                      <div
+                        key={section.id}
+                        draggable
+                        onDragStart={() => handleDragStart(section.id)}
+                        onDragOver={(e) => handleDragOver(e, section.id)}
+                        onDrop={handleDrop}
+                        className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-left bg-primary/10 border border-primary/30 cursor-grab active:cursor-grabbing select-none"
+                        data-testid={`selected-section-${section.id}`}
+                      >
+                        <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex items-center justify-center h-7 w-7 rounded-md bg-primary text-primary-foreground flex-shrink-0">
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium">{section.label}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleSection(section.id); }}
+                          className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          data-testid={`remove-section-${section.id}`}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              {orderedSections.length > 0 && (
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Available</Label>
+              )}
+              <div className="space-y-1">
+                {SHAREABLE_SECTIONS.filter((s) => !selectedSections.has(s.id)).map((section) => {
+                  const available = isSectionAvailable(section.id);
+                  const Icon = section.icon;
+
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      disabled={!available}
+                      onClick={() => toggleSection(section.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
+                        !available
+                          ? "opacity-40 cursor-not-allowed"
                           : "hover-elevate border border-transparent"
-                    }`}
-                    data-testid={`toggle-section-${section.id}`}
-                  >
-                    <div className={`flex items-center justify-center h-8 w-8 rounded-md ${
-                      selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                    }`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{section.label}</div>
-                      <div className="text-xs text-muted-foreground truncate">{section.description}</div>
-                    </div>
-                    {selected && available && (
-                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                    )}
-                    {!available && (
-                      <Badge variant="outline" className="text-xs flex-shrink-0">No data</Badge>
-                    )}
-                  </button>
-                );
-              })}
+                      }`}
+                      data-testid={`toggle-section-${section.id}`}
+                    >
+                      <div className="flex items-center justify-center h-7 w-7 rounded-md bg-muted text-muted-foreground flex-shrink-0">
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{section.label}</div>
+                        <div className="text-xs text-muted-foreground truncate">{section.description}</div>
+                      </div>
+                      {!available && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0">No data</Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {selectedSections.has("offer_benefits") && (
@@ -496,7 +567,7 @@ export function ShareOfferDialog({
             <Button
               className="w-full"
               onClick={handleCreate}
-              disabled={isCreating || selectedSections.size === 0}
+              disabled={isCreating || orderedSections.length === 0}
               data-testid="button-generate-share-link"
             >
               {isCreating ? (

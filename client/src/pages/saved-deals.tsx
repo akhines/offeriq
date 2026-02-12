@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -43,6 +43,8 @@ import {
   Check,
   Link2,
   Copy,
+  GripVertical,
+  XCircle,
 } from "lucide-react";
 import type { SavedDeal } from "@shared/models/savedDeals";
 
@@ -108,9 +110,39 @@ export default function SavedDeals() {
   const [creatingSellerId, setCreatingSellerId] = useState<string | null>(null);
   const [dealShareUrls, setDealShareUrls] = useState<Record<string, string>>({});
   const [sellerDialogDeal, setSellerDialogDeal] = useState<SavedDeal | null>(null);
-  const [sellerSections, setSellerSections] = useState<Set<SectionId>>(new Set());
+  const [sellerSections, setSellerSections] = useState<SectionId[]>([]);
   const [sellerShareUrl, setSellerShareUrl] = useState<string | null>(null);
   const [sellerCopied, setSellerCopied] = useState(false);
+
+  const sellerDragItemRef = useRef<SectionId | null>(null);
+  const sellerDragOverRef = useRef<SectionId | null>(null);
+
+  const handleSellerDragStart = useCallback((id: SectionId) => {
+    sellerDragItemRef.current = id;
+  }, []);
+
+  const handleSellerDragOver = useCallback((e: React.DragEvent, id: SectionId) => {
+    e.preventDefault();
+    sellerDragOverRef.current = id;
+  }, []);
+
+  const handleSellerDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const dragId = sellerDragItemRef.current;
+    const dropId = sellerDragOverRef.current;
+    if (!dragId || !dropId || dragId === dropId) return;
+    setSellerSections(prev => {
+      const dragIdx = prev.indexOf(dragId);
+      const dropIdx = prev.indexOf(dropId);
+      if (dragIdx === -1 || dropIdx === -1) return prev;
+      const next = [...prev];
+      next.splice(dragIdx, 1);
+      next.splice(dropIdx, 0, dragId);
+      return next;
+    });
+    sellerDragItemRef.current = null;
+    sellerDragOverRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -180,18 +212,19 @@ export default function SavedDeals() {
 
   const openSellerDialog = (deal: SavedDeal) => {
     const available = getDealAvailableSections(deal);
+    const orderedDefaults = SHAREABLE_SECTIONS.filter(s => available.has(s.id)).map(s => s.id);
     setSellerDialogDeal(deal);
-    setSellerSections(new Set(available));
+    setSellerSections(orderedDefaults);
     setSellerShareUrl(null);
     setSellerCopied(false);
   };
 
+  const sellerSelectedSet = new Set<SectionId>(sellerSections);
+
   const toggleSellerSection = (id: SectionId) => {
     setSellerSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+      if (prev.includes(id)) return prev.filter(s => s !== id);
+      return [...prev, id];
     });
   };
 
@@ -199,7 +232,7 @@ export default function SavedDeals() {
     const deal = sellerDialogDeal;
     if (!deal) return;
 
-    if (sellerSections.size === 0) {
+    if (sellerSections.length === 0) {
       toast({ description: "Select at least one section to share", variant: "destructive" });
       return;
     }
@@ -237,12 +270,12 @@ export default function SavedDeals() {
         presentationOutput: presentationData?.presentationOutput || null,
         compsData,
         userComps: userCompsData,
-        offerBenefits: sellerSections.has("offer_benefits") ? DEFAULT_OFFER_BENEFITS : null,
+        offerBenefits: sellerSelectedSet.has("offer_benefits") ? DEFAULT_OFFER_BENEFITS : null,
       };
 
       const res = await apiRequest("POST", "/api/shares", {
         propertyAddress: deal.propertyAddress || "Unknown Property",
-        sections: Array.from(sellerSections),
+        sections: sellerSections,
         dealSnapshot,
         expiresInDays: null,
       });
@@ -727,51 +760,87 @@ export default function SavedDeals() {
                   {sellerDialogDeal.propertyAddress || sellerDialogDeal.dealName || "Untitled Deal"}
                 </p>
               )}
-              <div className="space-y-1.5">
-                {SHAREABLE_SECTIONS.map((section) => {
-                  const available = sellerDialogDeal ? getDealAvailableSections(sellerDialogDeal).has(section.id) : false;
-                  const selected = sellerSections.has(section.id);
-                  const Icon = section.icon;
+              {sellerSections.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Selected (drag to reorder)</p>
+                  <div className="space-y-1">
+                    {sellerSections.map((sectionId) => {
+                      const section = SHAREABLE_SECTIONS.find(s => s.id === sectionId);
+                      if (!section) return null;
+                      const Icon = section.icon;
+                      return (
+                        <div
+                          key={section.id}
+                          draggable
+                          onDragStart={() => handleSellerDragStart(section.id)}
+                          onDragOver={(e) => handleSellerDragOver(e, section.id)}
+                          onDrop={handleSellerDrop}
+                          className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-left bg-primary/10 border border-primary/30 cursor-grab active:cursor-grabbing select-none"
+                          data-testid={`selected-seller-section-${section.id}`}
+                        >
+                          <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex items-center justify-center h-7 w-7 rounded-md bg-primary text-primary-foreground flex-shrink-0">
+                            <Icon className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium">{section.label}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleSellerSection(section.id); }}
+                            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex-shrink-0"
+                            data-testid={`remove-seller-section-${section.id}`}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      disabled={!available}
-                      onClick={() => toggleSellerSection(section.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
-                        !available
-                          ? "opacity-40 cursor-not-allowed"
-                          : selected
-                            ? "bg-primary/10 border border-primary/30"
+              <div className="space-y-1">
+                {sellerSections.length > 0 && (
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Available</p>
+                )}
+                <div className="space-y-1">
+                  {SHAREABLE_SECTIONS.filter(s => !sellerSelectedSet.has(s.id)).map((section) => {
+                    const available = sellerDialogDeal ? getDealAvailableSections(sellerDialogDeal).has(section.id) : false;
+                    const Icon = section.icon;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        disabled={!available}
+                        onClick={() => toggleSellerSection(section.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
+                          !available
+                            ? "opacity-40 cursor-not-allowed"
                             : "hover-elevate border border-transparent"
-                      }`}
-                      data-testid={`toggle-seller-section-${section.id}`}
-                    >
-                      <div className={`flex items-center justify-center h-8 w-8 rounded-md ${
-                        selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                      }`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium">{section.label}</div>
-                        <div className="text-xs text-muted-foreground truncate">{section.description}</div>
-                      </div>
-                      {selected && available && (
-                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      )}
-                      {!available && (
-                        <Badge variant="outline" className="text-xs flex-shrink-0">No data</Badge>
-                      )}
-                    </button>
-                  );
-                })}
+                        }`}
+                        data-testid={`toggle-seller-section-${section.id}`}
+                      >
+                        <div className="flex items-center justify-center h-7 w-7 rounded-md bg-muted text-muted-foreground flex-shrink-0">
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium">{section.label}</div>
+                          <div className="text-xs text-muted-foreground truncate">{section.description}</div>
+                        </div>
+                        {!available && (
+                          <Badge variant="outline" className="text-xs flex-shrink-0">No data</Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <Button
                 className="w-full"
                 onClick={handleCreateSellerPage}
-                disabled={creatingSellerId !== null || sellerSections.size === 0}
+                disabled={creatingSellerId !== null || sellerSections.length === 0}
                 data-testid="button-generate-seller-link"
               >
                 {creatingSellerId ? (

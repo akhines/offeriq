@@ -661,37 +661,30 @@ export default function SharedOfferPage() {
           </p>
         </div>
 
-        {sections.includes("property_details") && property && (
-          <PropertyDetailsSection property={property} />
-        )}
-
-        {sections.includes("avm_valuation") && underwritingOutput && (
-          <AVMValuationSection output={underwritingOutput} />
-        )}
-
-        {sections.includes("comparable_sales") && (
-          <ComparableSalesSection compsData={dealSnapshot?.compsData} userComps={dealSnapshot?.userComps} />
-        )}
-
-        {sections.includes("offer_benefits") && dealSnapshot?.offerBenefits && dealSnapshot.offerBenefits.length > 0 && (
-          <OfferBenefitsSection benefits={dealSnapshot.offerBenefits} />
-        )}
-
-        {sections.includes("offer_formula") && offerOutput && offerSettings && (
-          <OfferFormulaSection output={offerOutput} settings={offerSettings} />
-        )}
-
-        {sections.includes("offer_ladder") && offerOutput && (
-          <OfferLadderSection output={offerOutput} />
-        )}
-
-        {sections.includes("deal_grade") && offerOutput && (
-          <DealGradeSection output={offerOutput} />
-        )}
-
-        {sections.includes("negotiation_plan") && presentationOutput && (
-          <NegotiationPlanSection plan={presentationOutput} />
-        )}
+        {sections.map((sectionId: string) => {
+          switch (sectionId) {
+            case "property_details":
+              return property ? <PropertyDetailsSection key={sectionId} property={property} /> : null;
+            case "avm_valuation":
+              return underwritingOutput ? <AVMValuationSection key={sectionId} output={underwritingOutput} /> : null;
+            case "comparable_sales":
+              return <ComparableSalesSection key={sectionId} compsData={dealSnapshot?.compsData} userComps={dealSnapshot?.userComps} />;
+            case "offer_benefits":
+              return dealSnapshot?.offerBenefits && dealSnapshot.offerBenefits.length > 0
+                ? <OfferBenefitsSection key={sectionId} benefits={dealSnapshot.offerBenefits} /> : null;
+            case "offer_formula":
+              return offerOutput && offerSettings
+                ? <OfferFormulaSection key={sectionId} output={offerOutput} settings={offerSettings} /> : null;
+            case "offer_ladder":
+              return offerOutput ? <OfferLadderSection key={sectionId} output={offerOutput} /> : null;
+            case "deal_grade":
+              return offerOutput ? <DealGradeSection key={sectionId} output={offerOutput} /> : null;
+            case "negotiation_plan":
+              return presentationOutput ? <NegotiationPlanSection key={sectionId} plan={presentationOutput} /> : null;
+            default:
+              return null;
+          }
+        })}
 
         <div className="text-center pt-6 pb-8">
           <Separator className="mb-6" />
