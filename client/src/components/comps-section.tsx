@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,26 @@ import {
   List,
   X,
   Image as ImageIcon,
+  Ruler,
+  DollarSign,
+  Navigation,
 } from "lucide-react";
 import { CompsMap } from "@/components/comps-map";
 import type { CompsData, ComparableSale } from "@/types";
+
+const COMPACT_BREAKPOINT = 480;
+
+function useIsCompact() {
+  const [isCompact, setIsCompact] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT - 1}px)`);
+    const onChange = () => setIsCompact(window.innerWidth < COMPACT_BREAKPOINT);
+    mql.addEventListener("change", onChange);
+    setIsCompact(window.innerWidth < COMPACT_BREAKPOINT);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return isCompact;
+}
 
 interface CompsSectionProps {
   compsData: CompsData | null;
@@ -96,6 +113,7 @@ export function CompsSection({
   subjectSqft,
   onUseSuggestedARV,
 }: CompsSectionProps) {
+  const isCompact = useIsCompact();
   const [sortField, setSortField] = useState<SortField>("distanceMiles");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showAllComps, setShowAllComps] = useState(false);
@@ -409,6 +427,118 @@ export function CompsSection({
 
           {viewMode === "map" && hasMapData ? (
             <CompsMap compsData={compsData} filteredComps={filteredComps} />
+          ) : isCompact ? (
+            <>
+              {displayedComps.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  No comps match current filters. Try widening your criteria.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Sort by:</span>
+                    <Select value={sortField} onValueChange={(v) => { setSortField(v as SortField); }}>
+                      <SelectTrigger className="h-7 text-xs w-auto min-w-[100px]" data-testid="select-mobile-sort">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="price">Price</SelectItem>
+                        <SelectItem value="pricePerSqft">$/Sqft</SelectItem>
+                        <SelectItem value="sqft">Sqft</SelectItem>
+                        <SelectItem value="distanceMiles">Distance</SelectItem>
+                        <SelectItem value="soldDate">Sold Date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+                      data-testid="button-mobile-sort-direction"
+                    >
+                      <ArrowUpDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {displayedComps.map((comp, index) => {
+                    const daysAgo = getDaysAgo(comp.soldDate);
+                    return (
+                      <div
+                        key={index}
+                        className="p-3 rounded-md border bg-muted/30 space-y-2"
+                        data-testid={`card-comp-${index}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm truncate" title={comp.address} data-testid={`text-comp-address-${index}`}>
+                              <MapPin className="h-3 w-3 inline mr-1 flex-shrink-0" />
+                              {comp.address}
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              {comp.propertyType && (
+                                <span className="text-xs text-muted-foreground">{comp.propertyType}</span>
+                              )}
+                              {comp.correlation !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                  {Math.round(comp.correlation * 100)}% match
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-bold font-mono text-sm" data-testid={`text-comp-price-${index}`}>
+                              {formatCurrency(comp.price)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="flex items-center gap-1">
+                            <Ruler className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span className="font-mono" data-testid={`text-comp-sqft-${index}`}>{comp.sqft.toLocaleString()} sqft</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span className="font-mono" data-testid={`text-comp-ppsqft-${index}`}>${comp.pricePerSqft}/sqft</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Navigation className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span data-testid={`text-comp-distance-${index}`}>{comp.distanceMiles.toFixed(2)} mi</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{comp.bedrooms} bed / {comp.bathrooms} bath</span>
+                          <span data-testid={`text-comp-sold-${index}`}>
+                            <Calendar className="h-3 w-3 inline mr-1" />
+                            {formatDate(comp.soldDate)}
+                            {daysAgo !== null && <span className="ml-1">({daysAgo}d ago)</span>}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {sortedComps.length > 5 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllComps(!showAllComps)}
+                  className="w-full"
+                  data-testid="button-toggle-all-comps"
+                >
+                  {showAllComps ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      Show All {sortedComps.length} Comps
+                    </>
+                  )}
+                </Button>
+              )}
+            </>
           ) : (
             <>
               <div className="rounded-md border overflow-x-auto">

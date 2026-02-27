@@ -153,11 +153,35 @@ export default function CompareDeals() {
             <h1 className="text-xl font-bold">Compare Deals</h1>
           </div>
         </header>
-        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-12 text-center">
-          <p className="text-muted-foreground">Select at least 2 deals from the dashboard to compare.</p>
-          <Button className="mt-4" onClick={() => setLocation("/deals")} data-testid="button-go-back">
-            Go to My Deals
-          </Button>
+        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-12">
+          <Card>
+            <CardContent className="p-12 text-center space-y-4">
+              <GitCompareArrows className="h-12 w-12 mx-auto text-muted-foreground" />
+              <div>
+                <p className="text-lg font-semibold" data-testid="text-empty-compare">Select deals to compare</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Go to your saved deals and select 2-3 deals using the checkboxes, then click Compare.
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-2 pt-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  <span>Compare ARV, offer prices, and margins side by side</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-3.5 w-3.5" />
+                  <span>See which deal has the best grade and highest potential</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-3.5 w-3.5" />
+                  <span>Review risk and confidence scores across deals</span>
+                </div>
+              </div>
+              <Button className="mt-2" onClick={() => setLocation("/deals")} data-testid="button-go-back">
+                Go to My Deals
+              </Button>
+            </CardContent>
+          </Card>
         </main>
       </div>
     );

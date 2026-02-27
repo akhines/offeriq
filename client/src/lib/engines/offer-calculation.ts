@@ -5,24 +5,20 @@ import {
   OfferLadderItem,
 } from "@/types";
 
-/**
- * NEW FORMULA (User's Wholesale Model):
- * Wholesale Price = (ARV × (1 - closingCostPct)) - (ARV × profitPct) - repairHigh
- * 
- * Where:
- * - ARV = After Repair Value (manual or from AVM blend)
- * - closingCostPct = 8-10% (default 8%)
- * - profitPct = 13-20% risk-based profit (default 20%)
- * - repairHigh = top end of repair estimate
- * 
- * Example: (175000 × 0.92) - (175000 × 0.20) - 75000 = $51,000
- */
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return fallback;
+  return n;
+}
+
 export function calculateWholesalePrice(
   underwriting: UnderwritingOutput,
   settings: OfferSettings
 ): number {
-  const { arv, repairHigh } = underwriting;
-  const { profitPct, closingCostPct } = settings;
+  const arv = safeNum(underwriting.arv);
+  const repairHigh = safeNum(underwriting.repairHigh);
+  const profitPct = safeNum(settings.profitPct);
+  const closingCostPct = safeNum(settings.closingCostPct);
   
   const closingMultiplier = 1 - (closingCostPct / 100);
   const profitDeduction = arv * (profitPct / 100);
@@ -36,14 +32,20 @@ export function calculateInvestorBuyPrice(
   underwriting: UnderwritingOutput,
   settings: OfferSettings
 ): number {
-  const { arv, repairHigh } = underwriting;
-  const { strategy, profitPct, closingCostPct, targetRulePct, closingCosts, holdingBuffer, riskBuffer, marketCoolingFactorPct, desiredProfit } = settings;
+  const { strategy } = settings;
   
   if (strategy === "wholesale") {
     return calculateWholesalePrice(underwriting, settings);
   }
   
-  const { asIsBase } = underwriting;
+  const asIsBase = safeNum(underwriting.asIsBase);
+  const targetRulePct = safeNum(settings.targetRulePct);
+  const closingCosts = safeNum(settings.closingCosts);
+  const holdingBuffer = safeNum(settings.holdingBuffer);
+  const riskBuffer = safeNum(settings.riskBuffer);
+  const marketCoolingFactorPct = safeNum(settings.marketCoolingFactorPct);
+  const desiredProfit = safeNum(settings.desiredProfit);
+  
   const coolingAdjustment = asIsBase * (marketCoolingFactorPct / 100);
   const adjustedBase = asIsBase - coolingAdjustment;
   
@@ -65,10 +67,11 @@ export function calculateSellerOffer(
   investorBuyPrice: number,
   settings: OfferSettings
 ): number {
+  const safeBuyPrice = safeNum(investorBuyPrice);
   if (settings.strategy === "wholesale") {
-    return Math.round(Math.max(0, investorBuyPrice - settings.assignmentFee));
+    return Math.round(Math.max(0, safeBuyPrice - safeNum(settings.assignmentFee)));
   }
-  return investorBuyPrice;
+  return Math.round(Math.max(0, safeBuyPrice));
 }
 
 export function generateOfferLadder(
@@ -135,9 +138,11 @@ export function calculateDealGrade(
   sellerOffer: number,
   settings: OfferSettings
 ): "A" | "B" | "C" | "D" {
-  const { confidenceScore, arv } = underwriting;
+  const confidenceScore = safeNum(underwriting.confidenceScore);
+  const arv = safeNum(underwriting.arv);
+  const safeSellerOffer = safeNum(sellerOffer);
   
-  const margin = arv - sellerOffer;
+  const margin = arv - safeSellerOffer;
   const marginPct = arv > 0 ? (margin / arv) * 100 : 0;
   
   let grade = 0;
@@ -168,8 +173,9 @@ export function calculateOfferOutput(
   const sensitivity = generateSensitivity(underwriting, investorBuyPrice, sellerOffer, settings);
   const dealGrade = calculateDealGrade(underwriting, investorBuyPrice, sellerOffer, settings);
   
-  const margin = underwriting.arv - sellerOffer;
-  const marginPct = underwriting.arv > 0 ? (margin / underwriting.arv) * 100 : 0;
+  const arv = safeNum(underwriting.arv);
+  const margin = arv - sellerOffer;
+  const marginPct = arv > 0 ? (margin / arv) * 100 : 0;
   
   return {
     investorBuyPrice,
@@ -177,7 +183,7 @@ export function calculateOfferOutput(
     offerLadder,
     sensitivity,
     dealGrade,
-    margin,
-    marginPct,
+    margin: Number.isFinite(margin) ? margin : 0,
+    marginPct: Number.isFinite(marginPct) ? Math.round(marginPct * 100) / 100 : 0,
   };
 }

@@ -214,7 +214,7 @@ export function ShareOfferDialog({
     }
 
     if (orderedSections.length === 0) {
-      toast({ description: "Select at least one section to share", variant: "destructive" });
+      toast({ title: "No Sections Selected", description: "Choose at least one section to include in the shared link.", variant: "destructive" });
       return;
     }
 
@@ -259,9 +259,9 @@ export function ShareOfferDialog({
       setView("success");
 
       fetchMyLinks();
-      toast({ description: "Share link created" });
+      toast({ title: "Link Created", description: "Your share link is ready. Send it to the property owner." });
     } catch (error) {
-      toast({ description: "Failed to create share link", variant: "destructive" });
+      toast({ title: "Creation Failed", description: "We couldn't create the share link. Please try again.", variant: "destructive" });
     } finally {
       setIsCreating(false);
     }
@@ -279,16 +279,16 @@ export function ShareOfferDialog({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-    toast({ description: "Link copied to clipboard" });
+    toast({ title: "Copied", description: "Share link copied to clipboard." });
   };
 
   const handleDeactivate = async (code: string) => {
     try {
       await apiRequest("PATCH", `/api/shares/${code}`, { isActive: false });
       setMyLinks((prev) => prev.map((l) => l.code === code ? { ...l, isActive: false } : l));
-      toast({ description: "Share link deactivated" });
+      toast({ title: "Link Deactivated", description: "This share link will no longer work for recipients." });
     } catch {
-      toast({ description: "Failed to deactivate link", variant: "destructive" });
+      toast({ title: "Deactivation Failed", description: "We couldn't deactivate this link. Please try again.", variant: "destructive" });
     }
   };
 
@@ -326,11 +326,12 @@ export function ShareOfferDialog({
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
+          className="sm:w-auto sm:px-3 min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-0"
           disabled={!hasData}
           data-testid="button-share-offer"
         >
-          <Share2 className="h-4 w-4 mr-1.5" />
+          <Share2 className="h-4 w-4 sm:mr-1.5" />
           <span className="hidden sm:inline">Share</span>
         </Button>
       </DialogTrigger>

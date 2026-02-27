@@ -18,6 +18,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError, redirectToLogin } from "@/lib/auth-utils";
 import { ShareOfferDialog } from "@/components/share-offer-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   FileText,
   Calculator,
   Presentation,
@@ -28,6 +36,14 @@ import {
   LogIn,
   Settings,
   Eye,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  Search,
+  BarChart3,
+  MessageSquare,
+  Share2,
+  Crown,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -81,6 +97,8 @@ export default function OfferIQ() {
 
   const [currentDealId, setCurrentDealId] = useState<string | null>(getDealIdFromUrl);
   const searchString = useSearch();
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [upgradeDialogMessage, setUpgradeDialogMessage] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(searchString);
@@ -217,14 +235,22 @@ export default function OfferIQ() {
         window.history.replaceState(null, "", `/app?deal=${data.id}`);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
-      toast({ description: "Deal saved successfully" });
+      toast({ title: "Deal Saved", description: "Your deal has been saved successfully." });
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         redirectToLogin(toast as any);
         return;
       }
-      toast({ description: "Failed to save deal", variant: "destructive" });
+      try {
+        const errBody = JSON.parse(error.message.replace(/^\d+:\s*/, ""));
+        if (errBody.code === "LIMIT_REACHED") {
+          setUpgradeDialogMessage(errBody.error || "You've reached your plan limit.");
+          setUpgradeDialogOpen(true);
+          return;
+        }
+      } catch {}
+      toast({ title: "Save Failed", description: "We couldn't save your deal. Please try again.", variant: "destructive" });
     },
   });
 
@@ -238,6 +264,7 @@ export default function OfferIQ() {
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedPrefsRef = useRef(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
     if (!isAuthenticated || currentDealId || hasLoadedPrefsRef.current) return;
@@ -258,13 +285,30 @@ export default function OfferIQ() {
   useEffect(() => {
     if (!isAuthenticated || currentDealId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      fetch("/api/preferences", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workingDealState: state, workingUserComps: userComps }),
-      }).catch(() => {});
+    saveTimerRef.current = setTimeout(async () => {
+      setAutoSaveStatus("saving");
+      let retries = 0;
+      while (retries < 3) {
+        try {
+          const res = await fetch("/api/preferences", {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ workingDealState: state, workingUserComps: userComps }),
+          });
+          if (res.ok) {
+            setAutoSaveStatus("saved");
+            setTimeout(() => setAutoSaveStatus("idle"), 2000);
+            return;
+          }
+          retries++;
+        } catch {
+          retries++;
+        }
+        if (retries < 3) await new Promise(r => setTimeout(r, 1000 * retries));
+      }
+      setAutoSaveStatus("error");
+      setTimeout(() => setAutoSaveStatus("idle"), 5000);
     }, 3000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [state, userComps, isAuthenticated, currentDealId]);
@@ -345,7 +389,7 @@ export default function OfferIQ() {
       handleReset();
     } else {
       doReset();
-      toast({ description: "Ready for a new deal" });
+      toast({ title: "New Deal", description: "Ready to start a new deal analysis." });
     }
   };
 
@@ -357,10 +401,67 @@ export default function OfferIQ() {
     saveDealMutation.mutate();
   };
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const onboardingCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || onboardingCheckedRef.current) return;
+    onboardingCheckedRef.current = true;
+    fetch("/api/preferences", { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(prefs => {
+        const settings = prefs?.settings as Record<string, any> | null;
+        if (!settings?.onboardingCompleted) {
+          setShowOnboarding(true);
+        }
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
+
+  const completeOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    setOnboardingStep(0);
+    fetch("/api/preferences", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { onboardingCompleted: true } }),
+    }).catch(() => {});
+  }, []);
+
+  const onboardingSteps = [
+    {
+      icon: Search,
+      title: "Enter Property Details",
+      description: "Start by entering a property address. OfferIQ pulls in public records and AVM baselines to give you a head start on your analysis.",
+    },
+    {
+      icon: FileText,
+      title: "Engine 1: Underwriting",
+      description: "Input property condition, seller motivation, and repair estimates. The underwriting engine calculates as-is value ranges, repair costs, and a confidence score.",
+    },
+    {
+      icon: Calculator,
+      title: "Engine 2: Offer Calculator",
+      description: "Set your investment strategy and fee structure. The offer engine generates investor buy prices, seller offers, deal grades, and a multi-tier offer ladder.",
+    },
+    {
+      icon: MessageSquare,
+      title: "Engine 3: AI Presentation Plan",
+      description: "Get an AI-generated negotiation strategy with talking points, objection handling, and a recommended offer tier tailored to the seller's situation.",
+    },
+    {
+      icon: Share2,
+      title: "Share with Sellers",
+      description: "Create a professional, branded offer page you can share with sellers. Save your deals, compare them side-by-side, and export reports.",
+    },
+  ];
+
   const handleCopyDealSummary = async () => {
     const summary = generateDealSummary();
     await navigator.clipboard.writeText(summary);
-    toast({ description: "Deal summary copied to clipboard" });
+    toast({ title: "Copied", description: "Deal summary copied to clipboard." });
   };
 
   const handleExportJSON = () => {
@@ -378,7 +479,7 @@ export default function OfferIQ() {
     a.download = `deal-${state.property.address?.replace(/[^a-z0-9]/gi, "-") || "export"}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ description: "Deal exported as JSON" });
+    toast({ title: "Exported", description: "Deal data downloaded as a JSON file." });
   };
 
   const generateDealSummary = () => {
@@ -443,7 +544,7 @@ export default function OfferIQ() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-14 py-2 sm:py-0 sm:h-16 flex items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-14 py-2 sm:py-0 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <FileText className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-bold">OfferIQ</h1>
@@ -451,10 +552,11 @@ export default function OfferIQ() {
               3-Engine Underwriter
             </Badge>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="sm:w-auto sm:px-3 min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-0"
               onClick={handleNewDeal}
               data-testid="button-new-deal"
             >
@@ -463,7 +565,8 @@ export default function OfferIQ() {
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="sm:w-auto sm:px-3 min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-0"
               onClick={handleSaveDeal}
               disabled={saveDealMutation.isPending}
               data-testid="button-save-deal"
@@ -473,6 +576,17 @@ export default function OfferIQ() {
                 {saveDealMutation.isPending ? "Saving..." : "Save Deal"}
               </span>
             </Button>
+            {isAuthenticated && autoSaveStatus !== "idle" && (
+              <span className={`text-xs flex items-center gap-1 ${
+                autoSaveStatus === "saving" ? "text-muted-foreground" :
+                autoSaveStatus === "saved" ? "text-green-600 dark:text-green-400" :
+                "text-destructive"
+              }`} data-testid="text-autosave-status">
+                {autoSaveStatus === "saving" && "Saving..."}
+                {autoSaveStatus === "saved" && "Saved"}
+                {autoSaveStatus === "error" && "Save failed"}
+              </span>
+            )}
             <ShareOfferDialog
               property={state.property}
               avmBaselines={state.avmBaselines}
@@ -488,7 +602,8 @@ export default function OfferIQ() {
             {isAuthenticated && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
+                className="sm:w-auto sm:px-3 min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-0"
                 onClick={() => setLocation("/deals")}
                 data-testid="link-my-deals"
               >
@@ -512,6 +627,7 @@ export default function OfferIQ() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9"
                   onClick={() => setLocation("/account")}
                   data-testid="button-account"
                   aria-label="Account settings"
@@ -521,6 +637,7 @@ export default function OfferIQ() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-9"
                   onClick={() => logout()}
                   data-testid="button-logout"
                   aria-label="Log out"
@@ -531,6 +648,7 @@ export default function OfferIQ() {
             ) : (
               <Button
                 variant="outline"
+                className="min-h-[44px] sm:min-h-8"
                 size="sm"
                 onClick={() => { window.location.href = "/api/login"; }}
                 data-testid="button-sign-in"
@@ -546,21 +664,21 @@ export default function OfferIQ() {
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <Tabs defaultValue="underwriting" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="underwriting" className="gap-2" data-testid="tab-underwriting">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Underwriting</span>
+            <TabsTrigger value="underwriting" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-underwriting">
+              <FileText className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] sm:text-sm truncate">Underwrite</span>
             </TabsTrigger>
-            <TabsTrigger value="offer" className="gap-2" data-testid="tab-offer">
-              <Calculator className="h-4 w-4" />
-              <span className="hidden sm:inline">Offer Calc</span>
+            <TabsTrigger value="offer" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-offer">
+              <Calculator className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] sm:text-sm truncate">Offer</span>
             </TabsTrigger>
-            <TabsTrigger value="presentation" className="gap-2" data-testid="tab-presentation">
-              <Presentation className="h-4 w-4" />
-              <span className="hidden sm:inline">AI Plan</span>
+            <TabsTrigger value="presentation" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-presentation">
+              <Presentation className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] sm:text-sm truncate">AI Plan</span>
             </TabsTrigger>
-            <TabsTrigger value="seller" className="gap-2" data-testid="tab-seller-presentation">
-              <Eye className="h-4 w-4" />
-              <span className="hidden sm:inline">Seller View</span>
+            <TabsTrigger value="seller" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-seller-presentation">
+              <Eye className="h-4 w-4 shrink-0" />
+              <span className="text-[11px] sm:text-sm truncate">Seller</span>
             </TabsTrigger>
           </TabsList>
 
@@ -611,6 +729,7 @@ export default function OfferIQ() {
               onPresentationInputChange={handlePresentationInputChange}
               onPresentationOutputChange={setPresentationOutput}
               onPdfUrlChange={setPresentationPdfUrl}
+              userTier={(user as any)?.subscriptionTier || "free"}
             />
           </TabsContent>
 
@@ -631,6 +750,130 @@ export default function OfferIQ() {
           <span className="hidden sm:inline">Data auto-saves locally</span>
         </div>
       </footer>
+
+      <Dialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-upgrade">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" data-testid="text-upgrade-title">
+              <Crown className="h-5 w-5 text-primary" />
+              Upgrade Your Plan
+            </DialogTitle>
+            <DialogDescription data-testid="text-upgrade-description">
+              {upgradeDialogMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setUpgradeDialogOpen(false)}
+              data-testid="button-upgrade-dismiss"
+            >
+              Maybe Later
+            </Button>
+            <Button
+              onClick={() => { setUpgradeDialogOpen(false); setLocation("/pricing"); }}
+              data-testid="button-upgrade-view-plans"
+            >
+              <Crown className="h-4 w-4" />
+              View Plans
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showOnboarding} onOpenChange={(open) => { if (!open) completeOnboarding(); }}>
+        <DialogContent className="sm:max-w-lg" data-testid="dialog-onboarding">
+          <DialogHeader>
+            <DialogTitle data-testid="text-onboarding-title">
+              {onboardingStep === 0 ? "Welcome to OfferIQ" : onboardingSteps[onboardingStep].title}
+            </DialogTitle>
+            <DialogDescription data-testid="text-onboarding-description">
+              {onboardingStep === 0
+                ? "Your 3-engine real estate deal analyzer. Let's walk through how it works."
+                : onboardingSteps[onboardingStep].description}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {onboardingStep === 0 ? (
+              <div className="space-y-3">
+                {onboardingSteps.map((step, i) => {
+                  const Icon = step.icon;
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 p-3 rounded-md hover-elevate cursor-pointer"
+                      onClick={() => setOnboardingStep(i)}
+                      data-testid={`button-onboarding-step-${i}`}
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{step.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{step.description}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center space-y-4">
+                {(() => {
+                  const Icon = onboardingSteps[onboardingStep].icon;
+                  return (
+                    <div className="w-16 h-16 rounded-md bg-primary/10 flex items-center justify-center">
+                      <Icon className="h-8 w-8 text-primary" />
+                    </div>
+                  );
+                })()}
+                <div className="flex items-center gap-1.5">
+                  {onboardingSteps.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === onboardingStep ? "w-6 bg-primary" : "w-1.5 bg-muted-foreground/30"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-row justify-between gap-2">
+            {onboardingStep > 0 ? (
+              <Button
+                variant="ghost"
+                onClick={() => setOnboardingStep(onboardingStep - 1)}
+                data-testid="button-onboarding-back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            ) : (
+              <div />
+            )}
+            {onboardingStep < onboardingSteps.length - 1 ? (
+              <Button
+                onClick={() => setOnboardingStep(onboardingStep + 1)}
+                data-testid="button-onboarding-next"
+              >
+                {onboardingStep === 0 ? "Take the Tour" : "Next"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={completeOnboarding}
+                data-testid="button-onboarding-done"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Get Started
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

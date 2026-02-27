@@ -11,6 +11,22 @@ import {
   UserCompsState,
 } from "@/types";
 
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return fallback;
+  return n;
+}
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, val));
+}
+
+function safeDivide(numerator: number, denominator: number, fallback = 0): number {
+  if (!Number.isFinite(denominator) || denominator === 0) return fallback;
+  const result = numerator / denominator;
+  return Number.isFinite(result) ? result : fallback;
+}
+
 export function getRehabPerSqft(conditionScore: number): number {
   if (conditionScore >= 9) return CONDITION_REHAB_MAP["9-10"];
   if (conditionScore >= 7) return CONDITION_REHAB_MAP["7-8"];
@@ -65,24 +81,27 @@ export function calculateAVMBlend(avmBaselines: AVMBaselines): { blendedValue: n
   let totalWeight = 0;
   let weightedSum = 0;
   
-  if (avmBaselines.zillowZestimate && avmBaselines.zillowZestimate > 0) {
-    blends.push({ source: "Zillow", value: avmBaselines.zillowZestimate, weight: AVM_WEIGHTS.zillow });
-    weightedSum += avmBaselines.zillowZestimate * AVM_WEIGHTS.zillow;
+  const zillowVal = safeNum(avmBaselines.zillowZestimate);
+  if (zillowVal > 0) {
+    blends.push({ source: "Zillow", value: zillowVal, weight: AVM_WEIGHTS.zillow });
+    weightedSum += zillowVal * AVM_WEIGHTS.zillow;
     totalWeight += AVM_WEIGHTS.zillow;
   }
   
-  if (avmBaselines.redfinEstimate && avmBaselines.redfinEstimate > 0) {
-    blends.push({ source: "Redfin", value: avmBaselines.redfinEstimate, weight: AVM_WEIGHTS.redfin });
-    weightedSum += avmBaselines.redfinEstimate * AVM_WEIGHTS.redfin;
+  const redfinVal = safeNum(avmBaselines.redfinEstimate);
+  if (redfinVal > 0) {
+    blends.push({ source: "Redfin", value: redfinVal, weight: AVM_WEIGHTS.redfin });
+    weightedSum += redfinVal * AVM_WEIGHTS.redfin;
     totalWeight += AVM_WEIGHTS.redfin;
   }
   
   if (avmBaselines.otherAVMs) {
-    const otherWeight = AVM_WEIGHTS.other / Math.max(1, avmBaselines.otherAVMs.length);
+    const otherWeight = safeDivide(AVM_WEIGHTS.other, Math.max(1, avmBaselines.otherAVMs.length), 0);
     for (const avm of avmBaselines.otherAVMs) {
-      if (avm.value > 0) {
-        blends.push({ source: avm.name, value: avm.value, weight: otherWeight });
-        weightedSum += avm.value * otherWeight;
+      const avmVal = safeNum(avm.value);
+      if (avmVal > 0) {
+        blends.push({ source: avm.name, value: avmVal, weight: otherWeight });
+        weightedSum += avmVal * otherWeight;
         totalWeight += otherWeight;
       }
     }
@@ -94,11 +113,13 @@ export function calculateAVMBlend(avmBaselines: AVMBaselines): { blendedValue: n
   
   const normalizedBlends = blends.map(b => ({
     ...b,
-    weight: b.weight / totalWeight,
+    weight: safeDivide(b.weight, totalWeight, 0),
   }));
   
+  const blendedValue = safeDivide(weightedSum, totalWeight, 0);
+  
   return {
-    blendedValue: weightedSum / totalWeight,
+    blendedValue: Math.max(0, Math.round(blendedValue)),
     blends: normalizedBlends,
   };
 }
@@ -171,22 +192,26 @@ export function blendARVWithUserComps(
   apiARV: number,
   userComps: UserCompsState | undefined
 ): { blendedARV: number; userCompsWeight: number } {
-  if (!userComps || userComps.comps.length === 0 || userComps.suggestedARV <= 0) {
-    return { blendedARV: apiARV, userCompsWeight: 0 };
+  const safeApiARV = safeNum(apiARV);
+  
+  if (!userComps || userComps.comps.length === 0 || safeNum(userComps.suggestedARV) <= 0) {
+    return { blendedARV: Math.max(0, safeApiARV), userCompsWeight: 0 };
   }
   
-  if (apiARV <= 0) {
-    return { blendedARV: userComps.suggestedARV, userCompsWeight: 1 };
+  const safeSuggestedARV = safeNum(userComps.suggestedARV);
+  
+  if (safeApiARV <= 0) {
+    return { blendedARV: Math.max(0, safeSuggestedARV), userCompsWeight: 1 };
   }
   
-  const userWeight = userComps.confidenceScore / 100;
+  const userWeight = clamp(safeNum(userComps.confidenceScore) / 100, 0, 1);
   const apiWeight = 1 - userWeight;
   
   const blendedARV = Math.round(
-    (userComps.suggestedARV * userWeight) + (apiARV * apiWeight)
+    (safeSuggestedARV * userWeight) + (safeApiARV * apiWeight)
   );
   
-  return { blendedARV, userCompsWeight: userWeight };
+  return { blendedARV: Math.max(0, blendedARV), userCompsWeight: userWeight };
 }
 
 export function calculateUnderwriting(
@@ -202,28 +227,32 @@ export function calculateUnderwriting(
   const { blendedValue, blends } = calculateAVMBlend(avmBaselines);
   const { score: confidenceScore, missingData } = calculateConfidenceScore(property, avmBaselines, publicInfo);
   
-  const baselineValue = blendedValue > 0 ? blendedValue : (manualAsIsEstimate || 0);
+  const safeManualAsIs = safeNum(manualAsIsEstimate);
+  const safeManualARV = safeNum(manualARV);
+  const safeManualRepairs = safeNum(manualRepairs);
   
-  if (baselineValue <= 0 && (!manualARV || manualARV <= 0)) {
+  const baselineValue = blendedValue > 0 ? blendedValue : Math.max(0, safeManualAsIs);
+  
+  if (baselineValue <= 0 && safeManualARV <= 0) {
     return null;
   }
   
-  const conditionScore = property.conditionScore ?? 5;
+  const conditionScore = clamp(safeNum(property.conditionScore, 5), 0, 10);
   const rehabPerSqft = getRehabPerSqft(conditionScore);
-  const sqft = property.sqft || 1500;
+  const sqft = Math.max(1, safeNum(property.sqft, 1500));
   const calculatedRepairBase = sqft * rehabPerSqft;
   
   const systemFailures = property.knownIssues ? detectSystemFailures(property.knownIssues) : [];
   const systemAdders = calculateSystemAdders(systemFailures);
   
-  const repairLow = manualRepairs && manualRepairs > 0 
-    ? Math.round(manualRepairs * 0.9) 
+  const repairLow = safeManualRepairs > 0 
+    ? Math.round(safeManualRepairs * 0.9) 
     : Math.round(calculatedRepairBase * 0.8 + systemAdders.low);
-  const repairBase = manualRepairs && manualRepairs > 0 
-    ? manualRepairs 
+  const repairBase = safeManualRepairs > 0 
+    ? safeManualRepairs 
     : Math.round(calculatedRepairBase);
-  const repairHigh = manualRepairs && manualRepairs > 0 
-    ? manualRepairs
+  const repairHigh = safeManualRepairs > 0 
+    ? safeManualRepairs
     : Math.round(calculatedRepairBase * 1.2 + systemAdders.high);
   
   let marketabilityDiscountPct = 0;
@@ -236,20 +265,20 @@ export function calculateUnderwriting(
   const marketabilityDiscount = Math.round(baselineValue * marketabilityDiscountPct);
   
   const asIsBase = baselineValue > 0 
-    ? Math.round(baselineValue - repairBase - marketabilityDiscount)
+    ? Math.max(0, Math.round(baselineValue - repairBase - marketabilityDiscount))
     : 0;
   
   const spreadFactor = confidenceScore >= 80 ? 0.05 : confidenceScore >= 60 ? 0.10 : 0.15;
-  const asIsLow = Math.round(asIsBase * (1 - spreadFactor));
+  const asIsLow = Math.max(0, Math.round(asIsBase * (1 - spreadFactor)));
   const asIsHigh = Math.round(asIsBase * (1 + spreadFactor));
   
   let arv: number;
   const drivers: string[] = [];
   
-  if (manualARV && manualARV > 0) {
-    arv = manualARV;
-    drivers.push(`Manual ARV: $${manualARV.toLocaleString()}`);
-  } else if (userComps && userComps.comps.length > 0 && userComps.suggestedARV > 0) {
+  if (safeManualARV > 0) {
+    arv = safeManualARV;
+    drivers.push(`Manual ARV: $${safeManualARV.toLocaleString()}`);
+  } else if (userComps && userComps.comps.length > 0 && safeNum(userComps.suggestedARV) > 0) {
     const { blendedARV, userCompsWeight } = blendARVWithUserComps(baselineValue, userComps);
     arv = blendedARV;
     if (userCompsWeight > 0 && baselineValue > 0) {

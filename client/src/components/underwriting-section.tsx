@@ -90,7 +90,7 @@ export function UnderwritingSection({
         if (response.status === 404) {
           toast({
             title: "No Comparable Sales Found",
-            description: "Could not find recent sales near this property.",
+            description: "We couldn't find recent sales near this property. Try a different address or check the spelling.",
           });
         }
         return;
@@ -102,14 +102,14 @@ export function UnderwritingSection({
       if (data.comps.length > 0) {
         toast({
           title: "Comparable Sales Loaded",
-          description: `Found ${data.comps.length} comparable properties.`,
+          description: `Found ${data.comps.length} comparable properties nearby.`,
         });
       }
     } catch (error) {
       console.error("Failed to fetch comps:", error);
       toast({
-        title: "Error",
-        description: "Failed to load comparable sales. Please try again.",
+        title: "Connection Issue",
+        description: "Could not load comparable sales right now. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -128,8 +128,8 @@ export function UnderwritingSection({
   const fetchPropertyValuation = async () => {
     if (!property.address?.trim()) {
       toast({
-        title: "Address Required",
-        description: "Please enter a property address first.",
+        title: "Address Needed",
+        description: "Enter a property address above before fetching data.",
         variant: "destructive",
       });
       return;
@@ -148,14 +148,14 @@ export function UnderwritingSection({
       if (!response.ok) {
         if (data.needsApiKey) {
           toast({
-            title: "API Key Required",
-            description: "Please add a RentCast API key to enable property data lookup.",
+            title: "Setup Required",
+            description: "Property data lookup requires additional configuration. Please contact support for assistance.",
             variant: "destructive",
           });
         } else {
           toast({
-            title: "Lookup Failed",
-            description: data.error || "Could not fetch property data.",
+            title: "Lookup Unsuccessful",
+            description: "We couldn't find data for this address. Double-check the address and try again.",
             variant: "destructive",
           });
         }
@@ -205,8 +205,8 @@ export function UnderwritingSection({
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch property data. Please try again.",
+        title: "Connection Issue",
+        description: "Could not reach the property data service. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -52,11 +53,11 @@ export default function AccountPage() {
 
   const handleLogoUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      toast({ description: "Please select an image file", variant: "destructive" });
+      toast({ title: "Invalid File", description: "Please select an image file (PNG, JPG, or similar).", variant: "destructive" });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ description: "Logo must be under 5MB", variant: "destructive" });
+      toast({ title: "File Too Large", description: "Your logo must be under 5MB. Try a smaller image.", variant: "destructive" });
       return;
     }
 
@@ -73,9 +74,9 @@ export default function AccountPage() {
 
       await apiRequest("POST", "/api/logo/save", { objectPath });
       queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
-      toast({ description: "Logo uploaded successfully" });
+      toast({ title: "Logo Updated", description: "Your company logo has been uploaded." });
     } catch {
-      toast({ description: "Failed to upload logo", variant: "destructive" });
+      toast({ title: "Upload Failed", description: "We couldn't upload your logo. Please try again.", variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -85,9 +86,9 @@ export default function AccountPage() {
     try {
       await apiRequest("DELETE", "/api/logo");
       queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
-      toast({ description: "Logo removed" });
+      toast({ title: "Logo Removed", description: "Your company logo has been removed." });
     } catch {
-      toast({ description: "Failed to remove logo", variant: "destructive" });
+      toast({ title: "Removal Failed", description: "We couldn't remove your logo. Please try again.", variant: "destructive" });
     }
   };
 
@@ -100,9 +101,9 @@ export default function AccountPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
       setCompanyNameDirty(false);
-      toast({ description: "Company name saved" });
+      toast({ title: "Saved", description: "Your company name has been updated." });
     } catch {
-      toast({ description: "Failed to save company name", variant: "destructive" });
+      toast({ title: "Save Failed", description: "We couldn't save your company name. Please try again.", variant: "destructive" });
     }
   };
 
@@ -127,6 +128,63 @@ export default function AccountPage() {
     basic: "Basic",
     premium: "Premium",
   };
+
+  const isPageLoading = subLoading || prefsLoading;
+
+  if (isPageLoading) {
+    return (
+      <div className="min-h-screen bg-background" data-testid="account-page-loading">
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="flex items-center gap-4 mb-8">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/app")} data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold">Account</h1>
+          </div>
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Skeleton className="h-5 w-5 rounded-md" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Skeleton className="h-5 w-5 rounded-md" />
+                <Skeleton className="h-5 w-36" />
+              </div>
+              <Skeleton className="h-3 w-64 mb-4" />
+              <Skeleton className="h-24 w-full rounded-md mb-4" />
+              <Skeleton className="h-9 w-full" />
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Skeleton className="h-5 w-5 rounded-md" />
+                <Skeleton className="h-5 w-24" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-6 w-20 rounded-md" />
+                </div>
+                <Skeleton className="h-9 w-32" />
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background" data-testid="account-page">

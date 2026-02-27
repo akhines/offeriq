@@ -5,12 +5,24 @@ import {
   OfferLadderItem,
 } from "../../types";
 
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return fallback;
+  return n;
+}
+
 export function calculateInvestorBuyPrice(
   underwriting: UnderwritingOutput,
   settings: OfferSettings
 ): number {
-  const { asIsBase } = underwriting;
-  const { strategy, targetRulePct, closingCosts, holdingBuffer, riskBuffer, marketCoolingFactorPct, desiredProfit } = settings;
+  const asIsBase = safeNum(underwriting.asIsBase);
+  const targetRulePct = safeNum(settings.targetRulePct);
+  const closingCosts = safeNum(settings.closingCosts);
+  const holdingBuffer = safeNum(settings.holdingBuffer);
+  const riskBuffer = safeNum(settings.riskBuffer);
+  const marketCoolingFactorPct = safeNum(settings.marketCoolingFactorPct);
+  const desiredProfit = safeNum(settings.desiredProfit);
+  const { strategy } = settings;
   
   const coolingAdjustment = asIsBase * (marketCoolingFactorPct / 100);
   const adjustedBase = asIsBase - coolingAdjustment;
@@ -38,10 +50,11 @@ export function calculateSellerOffer(
   investorBuyPrice: number,
   settings: OfferSettings
 ): number {
+  const safeBuyPrice = safeNum(investorBuyPrice);
   if (settings.strategy === "wholesale") {
-    return Math.round(Math.max(0, investorBuyPrice - settings.assignmentFee));
+    return Math.round(Math.max(0, safeBuyPrice - safeNum(settings.assignmentFee)));
   }
-  return investorBuyPrice;
+  return Math.round(Math.max(0, safeBuyPrice));
 }
 
 export function generateOfferLadder(
@@ -100,9 +113,11 @@ export function calculateDealGrade(
   sellerOffer: number,
   settings: OfferSettings
 ): "A" | "B" | "C" | "D" {
-  const { confidenceScore, asIsBase } = underwriting;
+  const confidenceScore = safeNum(underwriting.confidenceScore);
+  const asIsBase = safeNum(underwriting.asIsBase);
+  const safeSellerOffer = safeNum(sellerOffer);
   
-  const margin = asIsBase - sellerOffer;
+  const margin = asIsBase - safeSellerOffer;
   const marginPct = asIsBase > 0 ? (margin / asIsBase) * 100 : 0;
   
   let grade = 0;
@@ -133,8 +148,9 @@ export function calculateOfferOutput(
   const sensitivity = generateSensitivity(investorBuyPrice, sellerOffer, settings);
   const dealGrade = calculateDealGrade(underwriting, investorBuyPrice, sellerOffer, settings);
   
-  const margin = underwriting.asIsBase - sellerOffer;
-  const marginPct = underwriting.asIsBase > 0 ? (margin / underwriting.asIsBase) * 100 : 0;
+  const asIsBase = safeNum(underwriting.asIsBase);
+  const margin = asIsBase - sellerOffer;
+  const marginPct = asIsBase > 0 ? (margin / asIsBase) * 100 : 0;
   
   return {
     investorBuyPrice,
@@ -142,7 +158,7 @@ export function calculateOfferOutput(
     offerLadder,
     sensitivity,
     dealGrade,
-    margin,
-    marginPct,
+    margin: Number.isFinite(margin) ? margin : 0,
+    marginPct: Number.isFinite(marginPct) ? Math.round(marginPct * 100) / 100 : 0,
   };
 }

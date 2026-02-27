@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
+import rateLimit from "express-rate-limit";
 
 const app = express();
 const httpServer = createServer(app);
@@ -83,6 +84,35 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later" },
+  skip: (req) => !req.path.startsWith("/api"),
+});
+app.use(globalLimiter);
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "AI request limit reached. Please wait a minute before trying again." },
+});
+app.use("/api/ai", aiLimiter);
+
+const propertyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Property lookup limit reached. Please wait a minute before trying again." },
+});
+app.use("/api/property", propertyLimiter);
+app.use("/api/comps", propertyLimiter);
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -94,9 +124,13 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+let requestCounter = 0;
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
+  const requestId = `req-${++requestCounter}-${Date.now().toString(36)}`;
+  (req as any).requestId = requestId;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -108,8 +142,9 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+      const userId = (req as any).user?.claims?.sub || "anon";
+      let logLine = `[${requestId}] ${req.method} ${path} ${res.statusCode} in ${duration}ms user=${userId}`;
+      if (res.statusCode >= 400 && capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -127,12 +162,13 @@ app.use((req, res, next) => {
 
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    const requestId = (req as any).requestId || "unknown";
 
+    console.error(`[${requestId}] Unhandled error on ${req.method} ${req.path}:`, err.stack || err);
     res.status(status).json({ message });
-    throw err;
   });
 
   if (process.env.NODE_ENV === "production") {

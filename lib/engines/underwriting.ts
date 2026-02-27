@@ -10,6 +10,22 @@ import {
   AVM_WEIGHTS,
 } from "../../types";
 
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return fallback;
+  return n;
+}
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, val));
+}
+
+function safeDivide(numerator: number, denominator: number, fallback = 0): number {
+  if (!Number.isFinite(denominator) || denominator === 0) return fallback;
+  const result = numerator / denominator;
+  return Number.isFinite(result) ? result : fallback;
+}
+
 export function getRehabPerSqft(conditionScore: number): number {
   if (conditionScore >= 9) return CONDITION_REHAB_MAP["9-10"];
   if (conditionScore >= 7) return CONDITION_REHAB_MAP["7-8"];
@@ -64,24 +80,27 @@ export function calculateAVMBlend(avmBaselines: AVMBaselines): { blendedValue: n
   let totalWeight = 0;
   let weightedSum = 0;
   
-  if (avmBaselines.zillowZestimate && avmBaselines.zillowZestimate > 0) {
-    blends.push({ source: "Zillow", value: avmBaselines.zillowZestimate, weight: AVM_WEIGHTS.zillow });
-    weightedSum += avmBaselines.zillowZestimate * AVM_WEIGHTS.zillow;
+  const zillowVal = safeNum(avmBaselines.zillowZestimate);
+  if (zillowVal > 0) {
+    blends.push({ source: "Zillow", value: zillowVal, weight: AVM_WEIGHTS.zillow });
+    weightedSum += zillowVal * AVM_WEIGHTS.zillow;
     totalWeight += AVM_WEIGHTS.zillow;
   }
   
-  if (avmBaselines.redfinEstimate && avmBaselines.redfinEstimate > 0) {
-    blends.push({ source: "Redfin", value: avmBaselines.redfinEstimate, weight: AVM_WEIGHTS.redfin });
-    weightedSum += avmBaselines.redfinEstimate * AVM_WEIGHTS.redfin;
+  const redfinVal = safeNum(avmBaselines.redfinEstimate);
+  if (redfinVal > 0) {
+    blends.push({ source: "Redfin", value: redfinVal, weight: AVM_WEIGHTS.redfin });
+    weightedSum += redfinVal * AVM_WEIGHTS.redfin;
     totalWeight += AVM_WEIGHTS.redfin;
   }
   
   if (avmBaselines.otherAVMs) {
-    const otherWeight = AVM_WEIGHTS.other / Math.max(1, avmBaselines.otherAVMs.length);
+    const otherWeight = safeDivide(AVM_WEIGHTS.other, Math.max(1, avmBaselines.otherAVMs.length), 0);
     for (const avm of avmBaselines.otherAVMs) {
-      if (avm.value > 0) {
-        blends.push({ source: avm.name, value: avm.value, weight: otherWeight });
-        weightedSum += avm.value * otherWeight;
+      const avmVal = safeNum(avm.value);
+      if (avmVal > 0) {
+        blends.push({ source: avm.name, value: avmVal, weight: otherWeight });
+        weightedSum += avmVal * otherWeight;
         totalWeight += otherWeight;
       }
     }
@@ -93,11 +112,13 @@ export function calculateAVMBlend(avmBaselines: AVMBaselines): { blendedValue: n
   
   const normalizedBlends = blends.map(b => ({
     ...b,
-    weight: b.weight / totalWeight,
+    weight: safeDivide(b.weight, totalWeight, 0),
   }));
   
+  const blendedValue = safeDivide(weightedSum, totalWeight, 0);
+  
   return {
-    blendedValue: weightedSum / totalWeight,
+    blendedValue: Math.max(0, Math.round(blendedValue)),
     blends: normalizedBlends,
   };
 }
@@ -176,11 +197,12 @@ export function calculateUnderwriting(
   const { blendedValue, blends } = calculateAVMBlend(avmBaselines);
   const { score: confidenceScore, missingData } = calculateConfidenceScore(property, avmBaselines, publicInfo);
   
-  const baselineValue = blendedValue > 0 ? blendedValue : (manualAsIsEstimate || 0);
+  const safeManualAsIs = safeNum(manualAsIsEstimate);
+  const baselineValue = blendedValue > 0 ? blendedValue : Math.max(0, safeManualAsIs);
   
-  const conditionScore = property.conditionScore ?? 5;
+  const conditionScore = clamp(safeNum(property.conditionScore, 5), 0, 10);
   const rehabPerSqft = getRehabPerSqft(conditionScore);
-  const sqft = property.sqft || 1500;
+  const sqft = Math.max(1, safeNum(property.sqft, 1500));
   const repairBase = sqft * rehabPerSqft;
   
   const systemFailures = property.knownIssues ? detectSystemFailures(property.knownIssues) : [];
@@ -198,10 +220,10 @@ export function calculateUnderwriting(
   
   const marketabilityDiscount = Math.round(baselineValue * marketabilityDiscountPct);
   
-  const asIsBase = Math.round(baselineValue - repairBase - marketabilityDiscount);
+  const asIsBase = Math.max(0, Math.round(baselineValue - repairBase - marketabilityDiscount));
   
   const spreadFactor = confidenceScore >= 80 ? 0.05 : confidenceScore >= 60 ? 0.10 : 0.15;
-  const asIsLow = Math.round(asIsBase * (1 - spreadFactor));
+  const asIsLow = Math.max(0, Math.round(asIsBase * (1 - spreadFactor)));
   const asIsHigh = Math.round(asIsBase * (1 + spreadFactor));
   
   const drivers: string[] = [];

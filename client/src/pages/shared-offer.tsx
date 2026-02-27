@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   FileText,
@@ -696,6 +697,31 @@ export default function SharedOfferPage() {
         }
         const json = await res.json();
         setData(json);
+
+        if (json.propertyAddress) {
+          const companyLabel = json.dealSnapshot?.companyName || "OfferIQ";
+          document.title = `Offer for ${json.propertyAddress} | ${companyLabel}`;
+          const metaDesc = document.querySelector('meta[name="description"]');
+          if (metaDesc) {
+            metaDesc.setAttribute("content", `Review the offer package for ${json.propertyAddress}, prepared by ${companyLabel}.`);
+          }
+          const ogTitle = document.querySelector('meta[property="og:title"]');
+          if (ogTitle) {
+            ogTitle.setAttribute("content", `Offer for ${json.propertyAddress} | ${companyLabel}`);
+          }
+          const ogDesc = document.querySelector('meta[property="og:description"]');
+          if (ogDesc) {
+            ogDesc.setAttribute("content", `Review the offer package for ${json.propertyAddress}, prepared by ${companyLabel}.`);
+          }
+          const twTitle = document.querySelector('meta[name="twitter:title"]');
+          if (twTitle) {
+            twTitle.setAttribute("content", `Offer for ${json.propertyAddress} | ${companyLabel}`);
+          }
+          const twDesc = document.querySelector('meta[name="twitter:description"]');
+          if (twDesc) {
+            twDesc.setAttribute("content", `Review the offer package for ${json.propertyAddress}, prepared by ${companyLabel}.`);
+          }
+        }
       } catch {
         setError("Failed to load offer. Please check the link and try again.");
       } finally {
@@ -707,11 +733,69 @@ export default function SharedOfferPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-primary" />
-          <p className="text-muted-foreground">Loading offer package...</p>
-        </div>
+      <div className="min-h-screen bg-background" data-testid="shared-offer-loading">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-md" />
+              <Skeleton className="h-5 w-24" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-md" />
+          </div>
+        </header>
+        <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+          <div className="text-center mb-6">
+            <Skeleton className="h-6 w-64 mx-auto mb-2" />
+            <Skeleton className="h-4 w-40 mx-auto" />
+          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded-md" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-4 w-48 mb-3" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded-md" />
+                <Skeleton className="h-5 w-40" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Skeleton className="h-20 w-full rounded-md" />
+                <Skeleton className="h-20 w-full rounded-md" />
+                <Skeleton className="h-20 w-full rounded-md" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded-md" />
+                <Skeleton className="h-5 w-28" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full rounded-md" />
+                <Skeleton className="h-16 w-full rounded-md" />
+                <Skeleton className="h-16 w-full rounded-md" />
+              </div>
+            </CardContent>
+          </Card>
+        </main>
       </div>
     );
   }

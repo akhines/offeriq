@@ -192,6 +192,8 @@ export function SellerPresentationSection({
     }, 600);
   }, [settings.sellerComps, updateField, onChange]);
 
+  const hasUnderwritingData = !!offerOutput || !!propertyAddress;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -211,7 +213,35 @@ export function SellerPresentationSection({
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {!hasUnderwritingData && (
+        <Card>
+          <CardContent className="p-12 text-center space-y-4">
+            <Eye className="h-12 w-12 mx-auto text-muted-foreground" />
+            <div>
+              <p className="text-lg font-semibold" data-testid="text-empty-seller-view">Run underwriting first</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Enter a property address and run the underwriting engine to generate valuation data. Then come back here to build a professional seller presentation.
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-2 pt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Home className="h-3.5 w-3.5" />
+                <span>Enter a property address in the Underwriting tab</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-3.5 w-3.5" />
+                <span>Calculate your offer in the Offer Calculator tab</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Gift className="h-3.5 w-3.5" />
+                <span>Customize benefits and share with the seller</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasUnderwritingData && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
@@ -761,7 +791,7 @@ export function SellerPresentationSection({
             </CardContent>
           </Card>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

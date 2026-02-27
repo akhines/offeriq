@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
-import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences, users, sharedOffers } from "@shared/schema";
+import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences, users, sharedOffers, analyticsEvents, feedback, insertFeedbackSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { isAuthenticated } from "./replit_integrations/auth";
@@ -10,13 +10,23 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
+import { checkDealSaveLimit, checkAiPresentationLimit, getUserTier, TIER_LIMITS, type SubscriptionTier } from "./subscriptionGuard";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
-  app.post("/api/ai/question", async (req, res) => {
+  app.get("/api/health", async (_req, res) => {
+    try {
+      await db.execute(sql`SELECT 1`);
+      res.json({ status: "healthy", timestamp: new Date().toISOString() });
+    } catch (error) {
+      res.status(503).json({ status: "unhealthy", error: "Database connection failed" });
+    }
+  });
+
+  app.post("/api/ai/question", isAuthenticated, async (req: any, res) => {
     try {
       const parseResult = aiQuestionRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -58,7 +68,7 @@ Provide a concise, actionable analysis (2-3 paragraphs max). Focus on practical 
     }
   });
 
-  app.post("/api/ai/negotiation", async (req, res) => {
+  app.post("/api/ai/negotiation", isAuthenticated, async (req: any, res) => {
     try {
       const parseResult = aiNegotiationRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -202,8 +212,21 @@ IMPORTANT:
     }
   });
 
-  app.post("/api/ai/presentation", async (req, res) => {
+  app.post("/api/ai/presentation", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+
+      const limitCheck = await checkAiPresentationLimit(userId);
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          error: limitCheck.message,
+          code: "LIMIT_REACHED",
+          limitType: "ai_presentations",
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+        });
+      }
+
       const { seller, presentationInput, underwriting, offer } = req.body;
       
       if (!underwriting || !offer) {
@@ -307,7 +330,7 @@ Generate a JSON response with this structure:
     }
   });
 
-  app.post("/api/property/valuation", async (req, res) => {
+  app.post("/api/property/valuation", isAuthenticated, async (req: any, res) => {
     try {
       const { address } = req.body;
       
@@ -396,7 +419,7 @@ Generate a JSON response with this structure:
     }
   });
 
-  app.post("/api/comps", async (req, res) => {
+  app.post("/api/comps", isAuthenticated, async (req: any, res) => {
     try {
       const parseResult = compsRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -533,8 +556,21 @@ Generate a JSON response with this structure:
   registerObjectStorageRoutes(app);
 
   // Save presentation PDF endpoint
-  app.post("/api/presentations/save", async (req, res) => {
+  app.post("/api/presentations/save", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+
+      const limitCheck = await checkAiPresentationLimit(userId);
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          error: limitCheck.message,
+          code: "LIMIT_REACHED",
+          limitType: "ai_presentations",
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+        });
+      }
+
       const parseResult = createPresentationSchema.safeParse(req.body);
       if (!parseResult.success) {
         const validationError = fromError(parseResult.error);
@@ -543,13 +579,11 @@ Generate a JSON response with this structure:
 
       const { propertyAddress, presentationData, pdfBase64 } = parseResult.data;
 
-      // Validate PDF size (max 5MB base64 = ~3.75MB file)
       const MAX_PDF_SIZE = 5 * 1024 * 1024;
       if (pdfBase64.length > MAX_PDF_SIZE) {
         return res.status(400).json({ error: "PDF too large (max 5MB)" });
       }
 
-      // Validate base64 format
       if (!/^[A-Za-z0-9+/=]+$/.test(pdfBase64)) {
         return res.status(400).json({ error: "Invalid PDF format" });
       }
@@ -557,11 +591,9 @@ Generate a JSON response with this structure:
       const id = randomUUID();
       const objectStorageService = new ObjectStorageService();
 
-      // Get presigned URL for upload
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       const pdfPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
-      // Upload PDF to object storage
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
       const uploadResponse = await fetch(uploadURL, {
         method: 'PUT',
@@ -574,8 +606,6 @@ Generate a JSON response with this structure:
       if (!uploadResponse.ok) {
         throw new Error('Failed to upload PDF to storage');
       }
-
-      const userId = (req as any).user?.claims?.sub || null;
 
       const [presentation] = await db.insert(savedPresentations).values({
         id,
@@ -690,6 +720,18 @@ Generate a JSON response with this structure:
   app.post("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+
+      const limitCheck = await checkDealSaveLimit(userId);
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          error: limitCheck.message,
+          code: "LIMIT_REACHED",
+          limitType: "saved_deals",
+          currentCount: limitCheck.currentCount,
+          limit: limitCheck.limit,
+        });
+      }
+
       const parseResult = insertSavedDealSchema.safeParse(req.body);
       if (!parseResult.success) {
         const validationError = fromError(parseResult.error);
@@ -802,7 +844,10 @@ Generate a JSON response with this structure:
         const updateData: Record<string, any> = { updatedAt: new Date() };
         if (workingDealState !== undefined) updateData.workingDealState = workingDealState;
         if (workingUserComps !== undefined) updateData.workingUserComps = workingUserComps;
-        if (settings !== undefined) updateData.settings = settings;
+        if (settings !== undefined) {
+          const existingSettings = (existing.settings as Record<string, any>) || {};
+          updateData.settings = { ...existingSettings, ...settings };
+        }
 
         const [prefs] = await db.update(userPreferences)
           .set(updateData)
@@ -896,9 +941,12 @@ Generate a JSON response with this structure:
     }
   });
 
-  app.get("/api/presentations", async (req, res) => {
+  app.get("/api/presentations", isAuthenticated, async (req: any, res) => {
     try {
-      const rows = await db.select().from(savedPresentations).orderBy(desc(savedPresentations.createdAt));
+      const userId = req.user.claims.sub;
+      const rows = await db.select().from(savedPresentations)
+        .where(eq(savedPresentations.userId, userId))
+        .orderBy(desc(savedPresentations.createdAt));
       const presentations = rows.map(p => ({
         id: p.id,
         propertyAddress: p.propertyAddress,
@@ -913,6 +961,37 @@ Generate a JSON response with this structure:
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to list presentations" 
       });
+    }
+  });
+
+  app.get("/api/subscription/usage", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [dealCheck, presentationCheck] = await Promise.all([
+        checkDealSaveLimit(userId),
+        checkAiPresentationLimit(userId),
+      ]);
+
+      const tier = await getUserTier(userId);
+      const limits = TIER_LIMITS[tier as SubscriptionTier] || TIER_LIMITS.free;
+
+      res.json({
+        tier,
+        savedDeals: {
+          current: dealCheck.currentCount ?? 0,
+          limit: limits.maxSavedDeals === Infinity ? null : limits.maxSavedDeals,
+          allowed: dealCheck.allowed,
+        },
+        aiPresentations: {
+          current: presentationCheck.currentCount ?? 0,
+          limit: limits.maxAiPresentationsPerMonth === Infinity ? null : limits.maxAiPresentationsPerMonth,
+          allowed: presentationCheck.allowed,
+          periodLabel: "this month",
+        },
+      });
+    } catch (error) {
+      console.error("Get usage error:", error);
+      res.status(500).json({ error: "Failed to get usage data" });
     }
   });
 
@@ -1217,7 +1296,76 @@ Generate a JSON response with this structure:
     }
   });
 
-  app.post("/api/parse-listing-url", async (req, res) => {
+  app.get("/s/:code", async (req, res, next) => {
+    const botPattern = /bot|crawl|spider|facebook|twitter|linkedin|slack|discord|whatsapp|telegram|preview|fetch|curl|wget|embed/i;
+    const userAgent = req.headers["user-agent"] || "";
+
+    if (!botPattern.test(userAgent)) {
+      return next();
+    }
+
+    try {
+      const { code } = req.params;
+      const [shared] = await db.select().from(sharedOffers)
+        .where(eq(sharedOffers.code, code));
+
+      if (!shared || !shared.isActive) {
+        return next();
+      }
+
+      const snapshot = shared.dealSnapshot as any;
+      const address = shared.propertyAddress || "Property";
+      const companyName = snapshot?.companyName || "OfferIQ";
+      const ogTitle = `Offer for ${address} | ${companyName}`;
+      const ogDescription = `Review the offer package for ${address}, prepared by ${companyName}.`;
+
+      const fs = await import("fs");
+      const path = await import("path");
+
+      let templatePath: string;
+      if (process.env.NODE_ENV === "production") {
+        templatePath = path.resolve(__dirname, "public", "index.html");
+      } else {
+        templatePath = path.resolve(import.meta.dirname, "..", "client", "index.html");
+      }
+
+      let html = await fs.promises.readFile(templatePath, "utf-8");
+
+      const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+      html = html.replace(
+        /<title>[^<]*<\/title>/,
+        `<title>${escHtml(ogTitle)}</title>`
+      );
+      html = html.replace(
+        /<meta name="description"[^>]*\/>/,
+        `<meta name="description" content="${escHtml(ogDescription)}" />`
+      );
+      html = html.replace(
+        /<meta property="og:title"[^>]*\/>/,
+        `<meta property="og:title" content="${escHtml(ogTitle)}" />`
+      );
+      html = html.replace(
+        /<meta property="og:description"[^>]*\/>/,
+        `<meta property="og:description" content="${escHtml(ogDescription)}" />`
+      );
+      html = html.replace(
+        /<meta name="twitter:title"[^>]*\/>/,
+        `<meta name="twitter:title" content="${escHtml(ogTitle)}" />`
+      );
+      html = html.replace(
+        /<meta name="twitter:description"[^>]*\/>/,
+        `<meta name="twitter:description" content="${escHtml(ogDescription)}" />`
+      );
+
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
+    } catch (error) {
+      console.error("Share OG tag injection error:", error);
+      next();
+    }
+  });
+
+  app.post("/api/parse-listing-url", isAuthenticated, async (req: any, res) => {
     try {
       const { url } = req.body;
       if (!url || typeof url !== "string") {
@@ -1470,6 +1618,51 @@ Generate a JSON response with this structure:
     } catch (error) {
       console.error("Parse listing URL error:", error);
       res.status(500).json({ error: "Failed to parse listing URL" });
+    }
+  });
+
+  // === ANALYTICS ===
+
+  app.post("/api/analytics/track", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { eventType, eventData } = req.body;
+      if (!eventType || typeof eventType !== "string") {
+        return res.status(400).json({ error: "eventType is required" });
+      }
+      await db.insert(analyticsEvents).values({
+        userId,
+        eventType,
+        eventData: eventData || null,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Track event error:", error);
+      res.status(500).json({ error: "Failed to track event" });
+    }
+  });
+
+  // === FEEDBACK ===
+
+  app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parseResult = insertFeedbackSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        const validationError = fromError(parseResult.error);
+        return res.status(400).json({ error: validationError.toString() });
+      }
+      const { category, message, screenshotUrl } = parseResult.data;
+      await db.insert(feedback).values({
+        userId,
+        category,
+        message,
+        screenshotUrl: screenshotUrl || null,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Submit feedback error:", error);
+      res.status(500).json({ error: "Failed to submit feedback" });
     }
   });
 

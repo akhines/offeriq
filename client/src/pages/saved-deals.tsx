@@ -167,11 +167,11 @@ export default function SavedDeals() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
-      toast({ description: "Deal deleted" });
+      toast({ title: "Deal Deleted", description: "The deal has been permanently removed." });
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) { redirectToLogin(toast as any); return; }
-      toast({ description: "Failed to delete deal", variant: "destructive" });
+      toast({ title: "Delete Failed", description: "We couldn't delete this deal. Please try again.", variant: "destructive" });
     },
   });
 
@@ -182,11 +182,11 @@ export default function SavedDeals() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       setSelectedIds(new Set());
-      toast({ description: statusTab === "active" ? "Deal archived" : "Deal restored" });
+      toast({ title: statusTab === "active" ? "Deal Archived" : "Deal Restored", description: statusTab === "active" ? "The deal has been moved to your archive." : "The deal has been restored to your active list." });
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) { redirectToLogin(toast as any); return; }
-      toast({ description: "Failed to update deal", variant: "destructive" });
+      toast({ title: "Update Failed", description: "We couldn't update this deal. Please try again.", variant: "destructive" });
     },
   });
 
@@ -233,7 +233,7 @@ export default function SavedDeals() {
     if (!deal) return;
 
     if (sellerSections.length === 0) {
-      toast({ description: "Select at least one section to share", variant: "destructive" });
+      toast({ title: "No Sections Selected", description: "Choose at least one section to include in the shared page.", variant: "destructive" });
       return;
     }
 
@@ -299,9 +299,9 @@ export default function SavedDeals() {
       const fullUrl = `${window.location.origin}${data.url}`;
       setDealShareUrls((prev) => ({ ...prev, [deal.id]: fullUrl }));
       setSellerShareUrl(fullUrl);
-      toast({ description: "Seller page link created" });
+      toast({ title: "Link Created", description: "Your seller page link is ready to share." });
     } catch {
-      toast({ description: "Failed to create seller page", variant: "destructive" });
+      toast({ title: "Creation Failed", description: "We couldn't create the seller page. Please try again.", variant: "destructive" });
     } finally {
       setCreatingSellerId(null);
     }
@@ -312,7 +312,7 @@ export default function SavedDeals() {
     await navigator.clipboard.writeText(sellerShareUrl);
     setSellerCopied(true);
     setTimeout(() => setSellerCopied(false), 2000);
-    toast({ description: "Link copied to clipboard" });
+    toast({ title: "Copied", description: "Share link copied to clipboard." });
   };
 
   const handleToggleSelect = (id: string) => {
@@ -326,7 +326,7 @@ export default function SavedDeals() {
 
   const handleCompare = () => {
     if (selectedIds.size < 2) {
-      toast({ description: "Select at least 2 deals to compare", variant: "destructive" });
+      toast({ title: "More Deals Needed", description: "Select at least 2 deals to compare side by side.", variant: "destructive" });
       return;
     }
     const ids = Array.from(selectedIds).join(",");
@@ -563,25 +563,73 @@ export default function SavedDeals() {
           </Card>
         ) : filteredDeals.length === 0 ? (
           <Card>
-            <CardContent className="p-12 text-center">
-              <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground" data-testid="text-empty-state">
-                {searchQuery
-                  ? "No deals match your search."
-                  : statusTab === "archived"
-                  ? "No archived deals yet."
-                  : "No saved deals yet. Start analyzing a property to save your first deal."}
-              </p>
-              {!searchQuery && statusTab === "active" && (
-                <Button
-                  variant="default"
-                  className="mt-4"
-                  onClick={() => setLocation("/app")}
-                  data-testid="button-start-deal"
-                >
-                  <Plus className="h-4 w-4" />
-                  Start a New Deal
-                </Button>
+            <CardContent className="p-12 text-center space-y-4">
+              {searchQuery ? (
+                <>
+                  <Search className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <div>
+                    <p className="text-lg font-semibold" data-testid="text-empty-state">No deals match your search</p>
+                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your search terms or clearing the filter.</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSearchQuery("")}
+                    data-testid="button-clear-search"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Clear Search
+                  </Button>
+                </>
+              ) : statusTab === "archived" ? (
+                <>
+                  <Archive className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <div>
+                    <p className="text-lg font-semibold" data-testid="text-empty-state">No archived deals</p>
+                    <p className="text-sm text-muted-foreground mt-1">Deals you archive from your active list will appear here.</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setStatusTab("active")}
+                    data-testid="button-view-active"
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                    View Active Deals
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <div>
+                    <p className="text-lg font-semibold" data-testid="text-empty-state">Analyze your first deal</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Enter a property address to run underwriting, calculate your offer, and generate an AI negotiation plan.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                    <Button
+                      variant="default"
+                      onClick={() => setLocation("/app")}
+                      data-testid="button-start-deal"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Start a New Deal
+                    </Button>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 pt-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5" />
+                      <span>Underwrite the property</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-3.5 w-3.5" />
+                      <span>Calculate your best offer</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Generate a seller presentation</span>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

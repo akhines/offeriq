@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ import {
   ArrowRight,
   Star,
   ChevronRight,
+  Menu,
+  X,
 } from "lucide-react";
 
 interface StripeProduct {
@@ -38,6 +40,15 @@ export default function LandingPage() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = "OfferIQ — Underwrite Deals. Build Offers. Close with Confidence.";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute("content", "OfferIQ is the 3-engine underwriting platform for wholesalers, flippers, and rental investors. Analyze deals with AVM blending, build smart offers, and prepare AI-powered negotiation plans — all in one place.");
+    }
+  }, []);
 
   const { data: productsData } = useQuery<{ products: StripeProduct[] }>({
     queryKey: ["/api/stripe/products"],
@@ -116,7 +127,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background" data-testid="landing-page">
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 h-14">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 h-14">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-[hsl(var(--primary))]" />
             <span className="font-bold text-lg" data-testid="text-brand">OfferIQ</span>
@@ -128,22 +139,79 @@ export default function LandingPage() {
           </nav>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {isAuthenticated ? (
-              <Button onClick={() => navigate("/app")} data-testid="button-go-to-app">
-                Go to App <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            ) : (
-              <>
-                <Button variant="ghost" onClick={() => window.location.href = "/api/login"} data-testid="button-login">
-                  Log In
+            <div className="hidden md:flex items-center gap-2">
+              {isAuthenticated ? (
+                <Button onClick={() => navigate("/app")} data-testid="button-go-to-app">
+                  Go to App <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
-                <Button onClick={() => window.location.href = "/api/login"} data-testid="button-signup">
-                  Get Started
-                </Button>
-              </>
-            )}
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => window.location.href = "/api/login"} data-testid="button-login">
+                    Log In
+                  </Button>
+                  <Button onClick={() => window.location.href = "/api/login"} data-testid="button-signup">
+                    Get Started
+                  </Button>
+                </>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden min-h-[44px] min-w-[44px]"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              data-testid="button-mobile-menu"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t bg-card/95 backdrop-blur-sm" data-testid="mobile-menu">
+            <nav className="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-1">
+              <a
+                href="#features"
+                className="flex items-center min-h-[44px] px-3 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors hover-elevate"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="link-features-mobile"
+              >
+                Features
+              </a>
+              <a
+                href="#pricing"
+                className="flex items-center min-h-[44px] px-3 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors hover-elevate"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="link-pricing-mobile"
+              >
+                Pricing
+              </a>
+              <a
+                href="#testimonials"
+                className="flex items-center min-h-[44px] px-3 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors hover-elevate"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="link-testimonials-mobile"
+              >
+                Testimonials
+              </a>
+              <div className="border-t my-2" />
+              {isAuthenticated ? (
+                <Button className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); navigate("/app"); }} data-testid="button-go-to-app-mobile">
+                  Go to App <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Button variant="ghost" className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); window.location.href = "/api/login"; }} data-testid="button-login-mobile">
+                    Log In
+                  </Button>
+                  <Button className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); window.location.href = "/api/login"; }} data-testid="button-signup-mobile">
+                    Get Started
+                  </Button>
+                </div>
+              )}
+            </nav>
+          </div>
+        )}
       </header>
 
       <section className="relative overflow-hidden">
@@ -162,10 +230,10 @@ export default function LandingPage() {
               OfferIQ is the 3-engine underwriting platform that helps wholesalers, flippers, and rental investors analyze deals, build smart offers, and prepare AI-powered negotiation plans -- all in one place.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <Button size="lg" onClick={handleGetStarted} data-testid="button-hero-cta">
+              <Button size="lg" className="min-h-[44px]" onClick={handleGetStarted} data-testid="button-hero-cta">
                 Start Free Trial <ArrowRight className="ml-1 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} data-testid="button-hero-learn-more">
+              <Button size="lg" variant="outline" className="min-h-[44px]" onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} data-testid="button-hero-learn-more">
                 See How It Works
               </Button>
             </div>

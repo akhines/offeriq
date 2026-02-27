@@ -306,8 +306,8 @@ export interface CompsData {
 }
 
 export const compsRequestSchema = z.object({
-  address: z.string().min(5, "Please enter a valid address"),
-  propertyType: z.string().optional(),
+  address: z.string().min(5, "Please enter a valid address").max(500),
+  propertyType: z.string().max(100).optional(),
 });
 
 export type CompsRequest = z.infer<typeof compsRequestSchema>;
@@ -343,9 +343,11 @@ export const conditionToRehabPerSqft: Record<number, number> = {
   10: 0,
 };
 
+export const MAX_TEXTAREA_LENGTH = 2000;
+
 export const aiQuestionRequestSchema = z.object({
-  questionId: z.string(),
-  answers: z.record(z.union([z.string(), z.number(), z.boolean(), z.undefined()])),
+  questionId: z.string().max(100),
+  answers: z.record(z.union([z.string().max(MAX_TEXTAREA_LENGTH), z.number(), z.boolean(), z.undefined()])),
   derived: z.object({
     rehabPerSqft: z.number(),
     rehabEstimate: z.number(),
@@ -356,7 +358,7 @@ export const aiQuestionRequestSchema = z.object({
     riskFlags: z.array(z.object({
       type: z.enum(["hvac", "systems", "expectation", "equity"]),
       severity: z.enum(["low", "medium", "high"]),
-      message: z.string(),
+      message: z.string().max(500),
     })),
     expectationGap: z.number(),
   }),
@@ -365,7 +367,7 @@ export const aiQuestionRequestSchema = z.object({
 export type AiQuestionRequest = z.infer<typeof aiQuestionRequestSchema>;
 
 export const aiNegotiationRequestSchema = z.object({
-  answers: z.record(z.union([z.string(), z.number(), z.boolean(), z.undefined()])),
+  answers: z.record(z.union([z.string().max(MAX_TEXTAREA_LENGTH), z.number(), z.boolean(), z.undefined()])),
   derived: z.object({
     rehabPerSqft: z.number(),
     rehabEstimate: z.number(),
@@ -376,7 +378,7 @@ export const aiNegotiationRequestSchema = z.object({
     riskFlags: z.array(z.object({
       type: z.enum(["hvac", "systems", "expectation", "equity"]),
       severity: z.enum(["low", "medium", "high"]),
-      message: z.string(),
+      message: z.string().max(500),
     })),
     expectationGap: z.number(),
   }),
@@ -419,9 +421,11 @@ export * from "./models/savedDeals";
 export * from "./models/savedPresentations";
 export * from "./models/userPreferences";
 export * from "./models/sharedOffers";
+export * from "./models/analytics";
+export * from "./models/feedback";
 
 export const createPresentationSchema = z.object({
-  propertyAddress: z.string(),
+  propertyAddress: z.string().max(500),
   presentationData: z.any(),
   pdfBase64: z.string(),
 });

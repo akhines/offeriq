@@ -10,6 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Sparkles,
   MessageSquare,
   Copy,
@@ -31,6 +39,7 @@ import {
   Download,
   Save,
   Share2,
+  Crown,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { apiRequest } from "@/lib/queryClient";
@@ -63,6 +72,7 @@ interface OfferPresentationSectionProps {
   onPresentationInputChange: (input: PresentationInput) => void;
   onPresentationOutputChange: (output: PresentationOutput) => void;
   onPdfUrlChange?: (url: string) => void;
+  userTier?: string;
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -72,7 +82,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
-    toast({ description: `${label || "Text"} copied to clipboard` });
+    toast({ title: "Copied", description: `${label || "Text"} copied to clipboard.` });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -102,6 +112,7 @@ export function OfferPresentationSection({
   onPresentationInputChange,
   onPresentationOutputChange,
   onPdfUrlChange,
+  userTier = "free",
 }: OfferPresentationSectionProps) {
   const { toast } = useToast();
   const [newNoteDate, setNewNoteDate] = useState(new Date().toISOString().split("T")[0]);
@@ -111,6 +122,9 @@ export function OfferPresentationSection({
   const [compLinkDisplayMode, setCompLinkDisplayMode] = useState<"list" | "preview">("list");
   const [savedPdfUrl, setSavedPdfUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [upgradeDialogMessage, setUpgradeDialogMessage] = useState("");
+  const isPremium = userTier === "premium";
 
   const generatePdf = (): jsPDF => {
     return generateProfessionalPdf({
@@ -134,7 +148,7 @@ export function OfferPresentationSection({
       ? `OfferIQ-${propertyAddress.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`
       : `OfferIQ-Presentation-${Date.now()}.pdf`;
     doc.save(filename);
-    toast({ description: "PDF downloaded successfully" });
+    toast({ title: "PDF Downloaded", description: "Your presentation report has been saved to your device." });
   };
 
   const handleSavePdf = async () => {
@@ -157,12 +171,14 @@ export function OfferPresentationSection({
 
       await navigator.clipboard.writeText(fullUrl);
       toast({
-        description: "PDF saved! Link copied to clipboard.",
+        title: "PDF Saved",
+        description: "Your presentation PDF has been saved. Link copied to clipboard.",
       });
     } catch (error) {
       toast({
+        title: "Save Failed",
         variant: "destructive",
-        description: error instanceof Error ? error.message : "Failed to save PDF",
+        description: "We couldn't save the PDF right now. Please try again.",
       });
     } finally {
       setIsSaving(false);
@@ -181,12 +197,23 @@ export function OfferPresentationSection({
     },
     onSuccess: (data) => {
       onPresentationOutputChange(data.plan);
-      toast({ description: "Presentation plan generated successfully" });
+      toast({ title: "Plan Ready", description: "Your AI presentation plan has been generated." });
     },
     onError: (error) => {
+      if (error instanceof Error) {
+        try {
+          const errBody = JSON.parse(error.message.replace(/^\d+:\s*/, ""));
+          if (errBody.code === "LIMIT_REACHED") {
+            setUpgradeDialogMessage(errBody.error || "You've reached your AI presentation limit.");
+            setUpgradeDialogOpen(true);
+            return;
+          }
+        } catch {}
+      }
       toast({
+        title: "Generation Failed",
         variant: "destructive",
-        description: error instanceof Error ? error.message : "Failed to generate plan",
+        description: "We couldn't generate the presentation plan. Please check your inputs and try again.",
       });
     },
   });
@@ -623,24 +650,32 @@ export function OfferPresentationSection({
                         <Download className="h-4 w-4 mr-1" />
                         Download PDF
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSavePdf}
-                        disabled={isSaving}
-                        data-testid="button-save-pdf"
-                      >
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Share2 className="h-4 w-4 mr-1" />
-                            Save & Share
-                          </>
+                      <div className="relative">
+                        <Button
+                          size="sm"
+                          onClick={handleSavePdf}
+                          disabled={isSaving}
+                          data-testid="button-save-pdf"
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Share2 className="h-4 w-4 mr-1" />
+                              Save & Share
+                            </>
+                          )}
+                        </Button>
+                        {!isPremium && (
+                          <Badge variant="secondary" className="absolute -top-2 -right-2 text-[10px] px-1 py-0">
+                            <Crown className="h-3 w-3 mr-0.5" />
+                            Premium
+                          </Badge>
                         )}
-                      </Button>
+                      </div>
                     </div>
                   </div>
                   {savedPdfUrl && (
@@ -871,6 +906,36 @@ export function OfferPresentationSection({
           </Card>
         )}
       </div>
+
+      <Dialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-upgrade-presentation">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" data-testid="text-upgrade-presentation-title">
+              <Crown className="h-5 w-5 text-primary" />
+              Upgrade Your Plan
+            </DialogTitle>
+            <DialogDescription data-testid="text-upgrade-presentation-description">
+              {upgradeDialogMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setUpgradeDialogOpen(false)}
+              data-testid="button-upgrade-presentation-dismiss"
+            >
+              Maybe Later
+            </Button>
+            <Button
+              onClick={() => { setUpgradeDialogOpen(false); window.location.href = "/pricing"; }}
+              data-testid="button-upgrade-presentation-view-plans"
+            >
+              <Crown className="h-4 w-4" />
+              View Plans
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

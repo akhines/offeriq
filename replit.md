@@ -6,10 +6,13 @@ A comprehensive real estate deal underwriting application with three main engine
 
 **Core Functionality:**
 - **Underwriting Engine**: AVM blending (Zillow 45%, Redfin 35%, Other 20%), repair estimates, confidence scoring
-- **Offer Calculation Engine**: Investor buy price, seller offer, 3-tier offer ladder (Fast Yes/Fair/Stretch with ±8% adjustments), deal grading (A/B/C/D)
+- **Offer Calculation Engine**: Investor buy price, seller offer, 3-tier offer ladder (Fast Yes/Fair/Stretch with +/-8% adjustments), deal grading (A/B/C/D)
 - **Offer Presentation Engine**: AI-powered negotiation plans using Tony Robbins 6 Human Needs and DISC profiling with ethical guardrails
 - **User Management**: Replit Auth (OIDC) with login/logout, saved deals per user
+- **Subscription Tiers**: Free Trial (3 deals, 2 AI), Basic $29/mo (10 deals, 5 AI/mo), Premium $79/mo (unlimited)
 - **Saved Deals**: CRUD operations for deal analyses stored in PostgreSQL, accessible from /deals dashboard
+- **Feedback System**: In-app feedback dialog (bug/feature/other) stored in PostgreSQL
+- **Analytics Tracking**: Event-based analytics stored in analytics_events table
 - localStorage autosave for all inputs (fallback when not logged in)
 - JSON export and copy-to-clipboard functionality
 
@@ -25,60 +28,85 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: React useState for local state with localStorage persistence
 - **UI Components**: shadcn/ui component library built on Radix UI primitives
 - **Styling**: Tailwind CSS with CSS variables for theming
+- **Error Boundary**: Global ErrorBoundary in App.tsx catches rendering errors with fallback UI
 
 **Design Pattern**: 3-Engine Architecture with pure functions for calculations
-- `client/src/lib/engines/underwriting.ts` - AVM blending, repair estimates, confidence scoring
-- `client/src/lib/engines/offer-calculation.ts` - Investor buy price, offer ladder, sensitivity analysis, deal grading
+- `client/src/lib/engines/underwriting.ts` - AVM blending, repair estimates, confidence scoring (with safeNum/safeDivide guards)
+- `client/src/lib/engines/offer-calculation.ts` - Investor buy price, offer ladder, sensitivity analysis, deal grading (with NaN/Infinity guards)
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript compiled with tsx for development, esbuild for production
 - **API Structure**: RESTful endpoints under `/api/` prefix
 - **AI Integration**: OpenAI API (via Replit AI Integrations) for negotiation plan generation
+- **Rate Limiting**: express-rate-limit with global (100/min), AI (10/min), and property lookup (20/min) limits
+- **Structured Logging**: Request IDs, user IDs, error context for all API calls
 
-**Key Endpoints:**
-- `POST /api/property/valuation` - Fetch property details and RentCast AVM estimates
-- `POST /api/comps` - Fetch comparable sales data from RentCast AVM endpoint
-- `POST /api/ai/presentation` - Generate AI-powered negotiation plan with ethical guardrails
+**Key Endpoints (all AI/property/comps/presentation endpoints require auth):**
+- `GET /api/health` - Health check endpoint (DB connectivity)
+- `POST /api/property/valuation` - Fetch property details and RentCast AVM estimates (auth required)
+- `POST /api/comps` - Fetch comparable sales data from RentCast AVM endpoint (auth required)
+- `POST /api/ai/question` - AI analysis for interview questions (auth required)
+- `POST /api/ai/negotiation` - AI negotiation plan generation (auth required)
+- `POST /api/ai/presentation` - Generate AI-powered negotiation plan (auth required, tier-limited)
 - `GET /api/deals` - List user's saved deals (auth required)
-- `GET /api/deals/:id` - Get single saved deal (auth required)
-- `POST /api/deals` - Create saved deal (auth required)
+- `POST /api/deals` - Create saved deal (auth required, tier-limited)
 - `PATCH /api/deals/:id` - Update saved deal (auth required)
 - `DELETE /api/deals/:id` - Delete saved deal (auth required)
 - `PATCH /api/deals/:id/archive` - Toggle archive/restore (auth required)
+- `GET /api/subscription/usage` - Get user's tier limits and usage counts (auth required)
 - `GET /api/preferences` - Get user preferences/working state (auth required)
 - `PUT /api/preferences` - Save user preferences/working state (auth required)
-- `POST /api/shares` - Create shared offer link with section selection (auth required)
+- `POST /api/shares` - Create shared offer link (auth required)
 - `GET /api/shares` - List user's shared links (auth required)
 - `PATCH /api/shares/:code` - Deactivate a shared link (auth required)
-- `GET /api/s/:code` - Public endpoint to fetch shared offer data (no auth)
+- `GET /api/s/:code` - Public endpoint to fetch shared offer data (with OG tag injection for bots)
+- `POST /api/presentations/save` - Save presentation PDF (auth required, tier-limited)
+- `GET /api/presentations` - List user's own presentations (auth required, scoped)
+- `POST /api/analytics/track` - Track usage events (auth required)
+- `POST /api/feedback` - Submit feedback (auth required)
+- `POST /api/parse-listing-url` - Parse listing URL for property details (auth required)
 - `/api/login` - Replit Auth OIDC login
 - `/api/logout` - Replit Auth OIDC logout
 - `/api/auth/user` - Get current authenticated user
 
+### Security
+- All AI, property, and presentation endpoints require authentication
+- Rate limiting: global (100 req/min), AI (10/min), property lookups (20/min)
+- Subscription tier enforcement via `server/subscriptionGuard.ts` (deal save limits, AI presentation limits)
+- Ownership checks on all deal/share CRUD operations (IDOR prevention)
+- SSRF protection on listing URL parser (domain allowlist + redirect validation)
+- Input length caps on all Zod schemas (2000 chars for textareas, 500 for addresses)
+
 ### Data Storage
 - **Client Persistence**: localStorage for all deal inputs, settings, and AI results (fast fallback for guests)
-- **Server Persistence**: PostgreSQL with Drizzle ORM for users, sessions, saved deals, saved presentations, and user preferences
-- **Auto-save**: Logged-in users get debounced (3s) auto-save of working deal state to `user_preferences` table; loads from server on return
-- **Schema Location**: `shared/schema.ts` re-exports from `shared/models/auth.ts`, `shared/models/savedDeals.ts`, `shared/models/savedPresentations.ts`, `shared/models/userPreferences.ts`
+- **Server Persistence**: PostgreSQL with Drizzle ORM for users, sessions, saved deals, saved presentations, user preferences, analytics, and feedback
+- **Auto-save**: Logged-in users get debounced (3s) auto-save with retry logic (3 attempts with backoff) and status indicator
+- **Schema Location**: `shared/schema.ts` re-exports from `shared/models/auth.ts`, `shared/models/savedDeals.ts`, `shared/models/savedPresentations.ts`, `shared/models/userPreferences.ts`, `shared/models/analytics.ts`, `shared/models/feedback.ts`
 - **Auth**: Replit Auth (OIDC) with passport, sessions stored in PostgreSQL
 
 ### Key Files
-- `client/src/pages/deal-desk.tsx` - Main OfferIQ page with tabbed 3-engine layout
-- `client/src/pages/saved-deals.tsx` - Saved deals dashboard with CRUD operations
-- `client/src/pages/compare-deals.tsx` - Side-by-side deal comparison page
-- `client/src/types.ts` - Complete type definitions for all engines (includes ComparableSale, CompsData)
+- `client/src/pages/deal-desk.tsx` - Main OfferIQ page with tabbed 3-engine layout + onboarding modal
+- `client/src/pages/saved-deals.tsx` - Saved deals dashboard with CRUD operations + rich empty states
+- `client/src/pages/compare-deals.tsx` - Side-by-side deal comparison page + guidance empty state
+- `client/src/pages/landing.tsx` - Marketing landing page with mobile hamburger nav
+- `client/src/types.ts` - Complete type definitions for all engines
+- `client/src/components/error-boundary.tsx` - Global error boundary with fallback UI
+- `client/src/components/feedback-dialog.tsx` - Floating feedback button + dialog
 - `client/src/components/underwriting-section.tsx` - Underwriting inputs/outputs UI with comps integration
-- `client/src/components/comps-section.tsx` - Comparable sales display with sortable table, filters, and map toggle
-- `client/src/components/comps-map.tsx` - Google Maps view showing comp locations relative to subject property
+- `client/src/components/comps-section.tsx` - Comparable sales display with responsive card/table layout
+- `client/src/components/comps-map.tsx` - Google Maps view showing comp locations
 - `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder
-- `client/src/components/offer-presentation-section.tsx` - AI presentation generator
-- `client/src/components/seller-presentation-section.tsx` - Seller-facing customizations (benefits, comps, company info, deal terms)
+- `client/src/components/offer-presentation-section.tsx` - AI presentation generator with premium badges
+- `client/src/components/seller-presentation-section.tsx` - Seller-facing customizations with guidance empty state
+- `server/subscriptionGuard.ts` - Tier limit enforcement (deal saves, AI presentations)
+- `capacitor.config.ts` - Capacitor iOS configuration (for App Store build on Mac)
 
 ### Build Configuration
 - Development: `tsx server/index.ts` with Vite middleware for HMR
 - Production: esbuild bundles server code, Vite builds client to `dist/public`
 - Path aliases: `@/` maps to client/src, `@shared/` maps to shared/
+- iOS: Capacitor configured with `com.offeriq.app` bundle ID, webDir `dist/public`
 
 ## Calculation Logic
 
@@ -87,89 +115,55 @@ Preferred communication style: Simple, everyday language.
 - Redfin: 35% weight
 - Other: 20% weight
 - Values normalized if any input is 0
+- Safety guards: safeNum(), safeDivide(), clamp() prevent NaN/Infinity
 
 ### Wholesale Formula
-The wholesale calculation uses a specific formula:
 ```
-Wholesale Price = (ARV × (1 - closingCostPct)) - (ARV × profitPct) - Repairs
+Wholesale Price = (ARV * (1 - closingCostPct)) - (ARV * profitPct) - Repairs
 ```
-- **ARV**: After Repair Value (manual input or from AVM blend)
-- **closingCostPct**: 6-12% adjustable (default 8%)
-- **profitPct**: 13-20% risk-based slider
-- **Repairs**: Manual repairs estimate used directly (no contingency added)
-
-Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 
 ### Offer Ladder
-- Fast Yes: +8% above Fair price (for quick closes, motivated sellers)
+- Fast Yes: +8% above Fair price
 - Fair: Baseline calculated offer
-- Stretch: -8% below Fair price (for flexible sellers, distressed properties)
+- Stretch: -8% below Fair price
 
 ### Deal Grading
-- A: High confidence (≥80%), high margin (≥30%), adequate buffers
-- B: Medium confidence (≥60%), decent margin (≥20%)
+- A: High confidence (>=80%), high margin (>=30%)
+- B: Medium confidence (>=60%), decent margin (>=20%)
 - C: Lower confidence or margin
-- D: Risky deal requiring careful consideration
+- D: Risky deal
 
 ### Comparable Sales Analysis
-- Auto-fetched when property data is loaded
-- Uses RentCast AVM endpoint's `comparables` array (up to 15 comps)
-- Includes lat/lng coordinates, correlation scores from RentCast API
-- Statistics: Avg $/Sqft, Median Price, Avg Price, Suggested ARV (recalculated when filters active)
-- Sortable table by price, sqft, $/sqft, distance, sold date, correlation
-- "Use Suggested ARV" button auto-populates Manual ARV field
-- **Map View**: Google Maps showing subject property (blue pin) and comp locations (green pins) with info windows
-- **Filters**: Distance slider (0.25-5mi), date range slider (1-24 months), property type dropdown
-- **Photo Thumbnails**: Google Street View images for each comp in table view
-- Toggle between table view and map view
+- Auto-fetched from RentCast (up to 15 comps)
+- Mobile-responsive: card layout on screens <480px, table on larger
+- Filters: distance (0.25-5mi), date range (1-24 months), property type
+- Map View: Google Maps with subject (blue) and comp (green) pins
 
-### User-Submitted Comps
-- Users can add their own comparable sales manually (address, price, sqft, beds/baths, sold date)
-- Confidence slider (0-100%) weights user comps vs API comps for ARV calculation
-- Blending formula: `blendedARV = (userARV × confidence%) + (apiARV × (100% - confidence%))`
-- At 100% confidence, only user comps are used; at 0%, only API comps
-- Sortable table, statistics (Avg $/SqFt, Avg Price, Your ARV)
-- Data persisted to localStorage
-
-### Seller Comps (Seller Presentation Tab)
-- Users can add up to 5 comparable properties with Zillow/Redfin/Realtor links
-- Server endpoint `POST /api/parse-listing-url` parses address from URL slug and attempts OG meta fetch for preview image
-- Domain-restricted to zillow.com, redfin.com, realtor.com only (SSRF prevention)
-- Each comp: URL, auto-parsed address, price, sqft, beds, baths, sold date, image URL, personal notes
-- Stored as `sellerComps` array in SellerPresentationSettings, persisted with deal data
-- Shared to seller page: comp cards with property details, photos, notes, and "View on Zillow/Redfin" buttons
-- Debounced URL parsing (600ms) with stale-state protection via settingsRef
-
-### AI Ethical Guardrails
-- DISC profiles presented as hypotheses, not diagnoses
-- 6 Human Needs assessments include confirming questions
-- No manipulation tactics, focus on win-win negotiations
+### Subscription Tier Limits
+- Free Trial: 3 saved deals, 2 AI presentations total
+- Basic ($29/mo): 10 saved deals, 5 AI presentations/month
+- Premium ($79/mo): Unlimited saved deals and AI presentations
+- Enforced server-side via subscriptionGuard.ts
 
 ### PDF Export & Sharing
-- **Download PDF**: Generate and download presentation plan as PDF locally
-- **Save & Share**: Upload PDF to Replit Object Storage and get a shareable link
-- **Unique Links**: Each saved presentation gets a unique URL (`/api/presentations/:id/pdf`)
-- **Library**: Uses jsPDF for client-side PDF generation
-- **Storage**: PDFs stored in Replit Object Storage with metadata in PostgreSQL `saved_presentations` table
-
-**Key Endpoints:**
-- `POST /api/presentations/save` - Save presentation PDF to object storage, returns unique link
-- `GET /api/presentations/:id/pdf` - Serve saved PDF by ID
-- `GET /api/presentations/:id` - Get presentation metadata
-- `GET /api/presentations` - List all saved presentations
+- Download PDF: jsPDF client-side generation
+- Save & Share: Upload to Replit Object Storage, unique URL
+- Storage: Object Storage with metadata in saved_presentations table
 
 ## External Dependencies
 
 ### AI Services
-- **OpenAI API**: Used through Replit AI Integrations
-- Model: gpt-4o for negotiation plan generation
-- Fallback: Stub responses when API keys are not configured
+- OpenAI API via Replit AI Integrations (gpt-4o)
+- Rate limited to 10 requests/min
+- Fallback stub responses when API keys not configured
 
 ### Key npm Dependencies
 - `drizzle-orm` / `drizzle-zod`: Database ORM and schema validation
 - `zod`: Runtime type validation
 - `wouter`: Client routing
-- `@react-google-maps/api`: Google Maps integration for comp map view
+- `@react-google-maps/api`: Google Maps integration
+- `express-rate-limit`: API rate limiting
+- `@capacitor/core` / `@capacitor/cli` / `@capacitor/ios`: iOS app packaging
 - Radix UI primitives: Accessible component foundations
 - `framer-motion`: Animations
 
@@ -177,3 +171,4 @@ Example: ARV $175k, profit 20%, closing 8%, repairs $75k = $51k wholesale price
 - Font families: Inter (UI text), Roboto Mono (numerical data)
 - Professional SaaS styling per `design_guidelines.md`
 - Component styling: shadcn/ui new-york style variant
+- Mobile-first: 44px touch targets, responsive grids, hamburger nav
