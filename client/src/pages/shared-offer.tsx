@@ -10,10 +10,8 @@ import {
   Home,
   TrendingUp,
   BarChart3,
-  Calculator,
   Layers,
   Award,
-  MessageSquare,
   Loader2,
   AlertCircle,
   LinkIcon,
@@ -21,11 +19,9 @@ import {
   Bath,
   Ruler,
   CalendarDays,
-  ArrowUpDown,
   ExternalLink,
   MapPin,
   DollarSign,
-  Gift,
   CheckCircle2,
   Phone,
   Mail,
@@ -33,6 +29,13 @@ import {
   Clock,
   MessageCircle,
   StickyNote,
+  ShieldCheck,
+  Zap,
+  Wrench,
+  HandshakeIcon,
+  Scale,
+  XCircle,
+  Check,
 } from "lucide-react";
 import type { OfferBenefit } from "@/components/share-offer-dialog";
 import type {
@@ -41,7 +44,6 @@ import type {
   UnderwritingOutput,
   OfferOutput,
   OfferSettings,
-  PresentationOutput,
   CompsData,
   ComparableSale,
   UserCompsState,
@@ -54,7 +56,7 @@ interface DealSnapshot {
   underwritingOutput: UnderwritingOutput | null;
   offerOutput: OfferOutput | null;
   offerSettings: OfferSettings;
-  presentationOutput: PresentationOutput | null;
+  presentationOutput?: any | null;
   compsData?: CompsData | null;
   userComps?: UserCompsState | null;
   offerBenefits?: OfferBenefit[] | null;
@@ -150,65 +152,36 @@ function PropertyDetailsSection({ property }: { property: PropertyInfo }) {
   );
 }
 
-function AVMValuationSection({ output }: { output: UnderwritingOutput }) {
-  const confidenceColor =
-    output.confidenceScore >= 80
-      ? "text-green-600 dark:text-green-400"
-      : output.confidenceScore >= 60
-        ? "text-yellow-600 dark:text-yellow-400"
-        : "text-red-600 dark:text-red-400";
-
+function PropertyValueSection({ output }: { output: UnderwritingOutput }) {
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          Valuation Summary
+          Property Value Estimate
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="text-center p-4 bg-muted/50 rounded-md">
-            <p className="text-xs text-muted-foreground mb-1">As-Is Value Range</p>
+            <p className="text-xs text-muted-foreground mb-1">Estimated Value Range</p>
             <p className="font-semibold">
               {formatCurrency(output.asIsLow)} - {formatCurrency(output.asIsHigh)}
             </p>
-            <p className="text-sm text-muted-foreground">Base: {formatCurrency(output.asIsBase)}</p>
           </div>
           <div className="text-center p-4 bg-muted/50 rounded-md">
-            <p className="text-xs text-muted-foreground mb-1">After Repair Value (ARV)</p>
+            <p className="text-xs text-muted-foreground mb-1">Market Value</p>
             <p className="text-xl font-bold text-primary" data-testid="text-shared-arv">
               {formatCurrency(output.arv)}
             </p>
           </div>
-          <div className="text-center p-4 bg-muted/50 rounded-md">
-            <p className="text-xs text-muted-foreground mb-1">Confidence Score</p>
-            <p className={`text-xl font-bold ${confidenceColor}`} data-testid="text-shared-confidence">
-              {output.confidenceScore}%
-            </p>
-          </div>
         </div>
-        {output.repairBase > 0 && (
-          <div className="mt-4 p-3 bg-muted/30 rounded-md">
-            <p className="text-sm text-muted-foreground mb-1">Estimated Repairs</p>
-            <p className="font-medium">
-              {formatCurrency(output.repairLow)} - {formatCurrency(output.repairHigh)}
-              <span className="text-muted-foreground text-sm ml-2">(base: {formatCurrency(output.repairBase)})</span>
-            </p>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
 }
 
 function OfferBenefitsSection({ benefits }: { benefits: OfferBenefit[] }) {
-  const benefitIcons = [
-    <Home className="h-5 w-5" />,
-    <DollarSign className="h-5 w-5" />,
-    <Gift className="h-5 w-5" />,
-  ];
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -218,23 +191,21 @@ function OfferBenefitsSection({ benefits }: { benefits: OfferBenefit[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
+        <ul className="space-y-3">
           {benefits.map((benefit, i) => (
-            <div
+            <li
               key={i}
-              className="flex gap-3 p-3 rounded-md bg-muted/30"
+              className="flex gap-3 items-start"
               data-testid={`benefit-card-${i}`}
             >
-              <div className="flex items-center justify-center h-10 w-10 rounded-md bg-primary/10 text-primary flex-shrink-0">
-                {benefitIcons[i] || <CheckCircle2 className="h-5 w-5" />}
-              </div>
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold" data-testid={`benefit-title-${i}`}>{benefit.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed" data-testid={`benefit-desc-${i}`}>{benefit.description}</p>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </CardContent>
     </Card>
   );
@@ -484,57 +455,6 @@ function ComparableSalesSection({ compsData, userComps }: { compsData?: CompsDat
   );
 }
 
-function OfferFormulaSection({ output, settings }: { output: OfferOutput; settings: OfferSettings }) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Calculator className="h-5 w-5 text-primary" />
-          Offer Formula
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="p-4 bg-muted/30 rounded-md">
-            <p className="text-xs text-muted-foreground mb-2">Calculation Method: {settings.strategy.charAt(0).toUpperCase() + settings.strategy.slice(1)}</p>
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span>Closing Cost %</span>
-                <span>{settings.closingCostPct}%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Profit Target %</span>
-                <span>{settings.profitPct}%</span>
-              </div>
-              {settings.assignmentFee > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Assignment Fee</span>
-                  <span>{formatCurrency(settings.assignmentFee)}</span>
-                </div>
-              )}
-              <Separator className="my-2" />
-              <div className="flex justify-between font-medium">
-                <span>Investor Buy Price</span>
-                <span data-testid="text-shared-investor-price">{formatCurrency(output.investorBuyPrice)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-primary">
-                <span>Your Offer to Seller</span>
-                <span data-testid="text-shared-seller-offer">{formatCurrency(output.sellerOffer)}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
-            <span className="text-sm">Margin</span>
-            <span className="font-medium">
-              {formatCurrency(output.margin)} ({output.marginPct.toFixed(1)}%)
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function OfferLadderSection({ output }: { output: OfferOutput }) {
   const tierColors: Record<string, string> = {
     "Fast Yes": "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800",
@@ -571,7 +491,7 @@ function OfferLadderSection({ output }: { output: OfferOutput }) {
   );
 }
 
-function DealGradeSection({ output }: { output: OfferOutput }) {
+function SellerDealGradeSection({ output, snapshot }: { output: OfferOutput; snapshot: DealSnapshot }) {
   const gradeColors: Record<string, string> = {
     A: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
     B: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -579,101 +499,224 @@ function DealGradeSection({ output }: { output: OfferOutput }) {
     D: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
   };
 
-  const gradeDescriptions: Record<string, string> = {
-    A: "High confidence, strong margins, and adequate buffers. This is a solid deal.",
-    B: "Decent confidence and margins. Good deal with manageable risk.",
-    C: "Lower confidence or margins. Proceed with caution.",
-    D: "Risky deal. Requires careful consideration and negotiation.",
+  const gradeLabels: Record<string, string> = {
+    A: "Excellent Offer",
+    B: "Strong Offer",
+    C: "Fair Offer",
+    D: "Starting Point",
   };
+
+  const gradeBenefits: Record<string, Array<{ icon: typeof ShieldCheck; text: string }>> = {
+    A: [
+      { icon: Wrench, text: "No repairs needed — sell as-is" },
+      { icon: Zap, text: "Fast closing timeline" },
+      { icon: DollarSign, text: "No realtor commissions or hidden fees" },
+      { icon: ShieldCheck, text: "High certainty of closing" },
+      { icon: HandshakeIcon, text: "Clear, simple terms" },
+      { icon: Scale, text: "Flexible on your timeline" },
+    ],
+    B: [
+      { icon: Wrench, text: "No repairs needed — sell as-is" },
+      { icon: HandshakeIcon, text: "Competitive offer with flexible terms" },
+      { icon: DollarSign, text: "No commissions or listing fees" },
+      { icon: Zap, text: "Faster than a traditional sale" },
+      { icon: ShieldCheck, text: "Reliable closing process" },
+    ],
+    C: [
+      { icon: DollarSign, text: "Fair market offer" },
+      { icon: Wrench, text: "Sell as-is — skip the repairs" },
+      { icon: HandshakeIcon, text: "Simplified selling process" },
+      { icon: Zap, text: "Quicker than listing on the market" },
+    ],
+    D: [
+      { icon: HandshakeIcon, text: "A starting point for discussion" },
+      { icon: Scale, text: "Room for creative terms" },
+      { icon: Wrench, text: "No repairs or prep needed" },
+      { icon: DollarSign, text: "No commissions" },
+    ],
+  };
+
+  const benefits = gradeBenefits[output.dealGrade] || gradeBenefits.C;
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Award className="h-5 w-5 text-primary" />
-          Deal Grade
+          Offer Strength
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-4">
-          <div className={`flex items-center justify-center w-16 h-16 rounded-md text-3xl font-bold ${gradeColors[output.dealGrade] || "bg-muted"}`} data-testid="text-shared-deal-grade">
+        <div className="flex items-start gap-4 mb-4">
+          <div className={`flex items-center justify-center w-16 h-16 rounded-md text-3xl font-bold flex-shrink-0 ${gradeColors[output.dealGrade] || "bg-muted"}`} data-testid="text-shared-deal-grade">
             {output.dealGrade}
           </div>
           <div className="flex-1">
-            <p className="text-sm text-muted-foreground">
-              {gradeDescriptions[output.dealGrade] || "Deal assessment unavailable."}
+            <p className="font-semibold text-base" data-testid="text-grade-label">
+              {gradeLabels[output.dealGrade] || "Offer Assessment"}
             </p>
-            <div className="flex gap-3 mt-2">
-              <Badge variant="outline" className="text-xs">
-                Margin: {output.marginPct.toFixed(1)}%
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Spread: {formatCurrency(output.margin)}
-              </Badge>
-            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Here's why this is a strong offer for you:
+            </p>
           </div>
+        </div>
+        <ul className="space-y-2">
+          {benefits.map((b, i) => {
+            const Icon = b.icon;
+            return (
+              <li key={i} className="flex items-center gap-3 text-sm" data-testid={`grade-benefit-${i}`}>
+                <Icon className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span>{b.text}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DealTermsSection({ snapshot }: { snapshot: DealSnapshot }) {
+  const hasTerms = snapshot.closingTimeline || snapshot.earnestMoneyDeposit || snapshot.additionalTerms;
+  if (!hasTerms) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          Deal Terms
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {snapshot.closingTimeline && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" /> Closing Timeline
+              </span>
+              <span className="font-medium" data-testid="text-closing-timeline">{snapshot.closingTimeline}</span>
+            </div>
+          )}
+          {snapshot.earnestMoneyDeposit && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <DollarSign className="h-3.5 w-3.5" /> Earnest Money
+              </span>
+              <span className="font-medium" data-testid="text-earnest-money">{snapshot.earnestMoneyDeposit}</span>
+            </div>
+          )}
+          {snapshot.additionalTerms && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground mb-1">Additional Terms</p>
+              <p className="text-sm whitespace-pre-wrap" data-testid="text-additional-terms">{snapshot.additionalTerms}</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function NegotiationPlanSection({ plan }: { plan: PresentationOutput }) {
+function ComparisonSection({ snapshot }: { snapshot: DealSnapshot }) {
+  const offerPrice = (snapshot.customOfferPrice && snapshot.customOfferPrice > 0)
+    ? snapshot.customOfferPrice
+    : snapshot.offerOutput?.sellerOffer || 0;
+
+  const arv = snapshot.underwritingOutput?.arv || 0;
+  const traditionalPrice = arv > 0 ? arv : offerPrice * 1.15;
+  const traditionalNet = Math.round(traditionalPrice * 0.94);
+
+  const rows = [
+    {
+      label: "Sale Price",
+      traditional: formatCurrency(Math.round(traditionalPrice)),
+      ourOffer: formatCurrency(offerPrice),
+    },
+    {
+      label: "Repairs Needed",
+      traditional: "Likely",
+      traditionalBad: true,
+      ourOffer: "None",
+      ourOfferGood: true,
+    },
+    {
+      label: "Commissions & Fees",
+      traditional: "5-6%",
+      traditionalBad: true,
+      ourOffer: "None",
+      ourOfferGood: true,
+    },
+    {
+      label: "Net to You",
+      traditional: `~${formatCurrency(traditionalNet)}`,
+      ourOffer: formatCurrency(offerPrice),
+      highlight: true,
+    },
+    {
+      label: "Time to Close",
+      traditional: "3-6 months",
+      traditionalBad: true,
+      ourOffer: snapshot.closingTimeline || "2-3 weeks",
+      ourOfferGood: true,
+    },
+    {
+      label: "Certainty",
+      traditional: "Depends on buyer financing",
+      traditionalBad: true,
+      ourOffer: "Cash — high certainty",
+      ourOfferGood: true,
+    },
+    {
+      label: "Convenience",
+      traditional: "Showings, staging, inspections",
+      traditionalBad: true,
+      ourOffer: "Simple, hassle-free",
+      ourOfferGood: true,
+    },
+  ];
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          Negotiation Plan
+          <Scale className="h-5 w-5 text-primary" />
+          Compare Your Options
         </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          See how this offer stacks up against listing on the open market.
+        </p>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm font-medium mb-1">Seller Summary</p>
-            <p className="text-sm text-muted-foreground">{plan.sellerSummary}</p>
-          </div>
-
-          {plan.recommendedOfferTier && (
-            <div className="p-3 bg-primary/5 rounded-md">
-              <p className="text-sm font-medium mb-1">Recommended Approach</p>
-              <Badge variant="secondary" className="capitalize">
-                {plan.recommendedOfferTier.replace(/_/g, " ")}
-              </Badge>
-            </div>
-          )}
-
-          {plan.talkTrackSoft && (
-            <div>
-              <p className="text-sm font-medium mb-1">Suggested Talk Track</p>
-              <p className="text-sm text-muted-foreground italic">"{plan.talkTrackSoft}"</p>
-            </div>
-          )}
-
-          {plan.objectionHandling && plan.objectionHandling.length > 0 && (
-            <div>
-              <p className="text-sm font-medium mb-2">Objection Handling</p>
-              <div className="space-y-2">
-                {plan.objectionHandling.map((obj, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm">
-                    <ArrowUpDown className="h-3.5 w-3.5 mt-0.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-muted-foreground">{obj}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {plan.nextActions && plan.nextActions.length > 0 && (
-            <div>
-              <p className="text-sm font-medium mb-2">Next Steps</p>
-              <ol className="space-y-1.5 list-decimal list-inside">
-                {plan.nextActions.map((action, i) => (
-                  <li key={i} className="text-sm text-muted-foreground">{action}</li>
-                ))}
-              </ol>
-            </div>
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="table-comparison">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 pr-3 text-muted-foreground font-medium w-1/3"></th>
+                <th className="text-center py-2 px-2 text-muted-foreground font-medium w-1/3">Traditional Listing</th>
+                <th className="text-center py-2 pl-2 font-semibold text-primary w-1/3">Our Offer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i} className={`border-b last:border-0 ${row.highlight ? "bg-primary/5" : ""}`} data-testid={`comparison-row-${i}`}>
+                  <td className="py-2.5 pr-3 text-muted-foreground font-medium">{row.label}</td>
+                  <td className="py-2.5 px-2 text-center">
+                    <span className={`inline-flex items-center gap-1 ${row.traditionalBad ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                      {row.traditionalBad && <XCircle className="h-3.5 w-3.5 flex-shrink-0" />}
+                      {row.traditional}
+                    </span>
+                  </td>
+                  <td className="py-2.5 pl-2 text-center">
+                    <span className={`inline-flex items-center gap-1 font-medium ${row.ourOfferGood ? "text-green-600 dark:text-green-400" : row.highlight ? "text-primary font-bold" : ""}`}>
+                      {row.ourOfferGood && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+                      {row.ourOffer}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
@@ -815,7 +858,7 @@ export default function SharedOfferPage() {
   }
 
   const { sections, dealSnapshot } = data;
-  const { property, underwritingOutput, offerOutput, offerSettings, presentationOutput, companyLogoPath, companyName } = dealSnapshot;
+  const { property, underwritingOutput, offerOutput, companyLogoPath, companyName } = dealSnapshot;
 
   return (
     <div className="min-h-screen bg-background">
@@ -905,21 +948,20 @@ export default function SharedOfferPage() {
             case "property_details":
               return property ? <PropertyDetailsSection key={sectionId} property={property} /> : null;
             case "avm_valuation":
-              return underwritingOutput ? <AVMValuationSection key={sectionId} output={underwritingOutput} /> : null;
+              return underwritingOutput ? <PropertyValueSection key={sectionId} output={underwritingOutput} /> : null;
             case "comparable_sales":
               return <ComparableSalesSection key={sectionId} compsData={dealSnapshot?.compsData} userComps={dealSnapshot?.userComps} />;
             case "offer_benefits":
               return dealSnapshot?.offerBenefits && dealSnapshot.offerBenefits.length > 0
                 ? <OfferBenefitsSection key={sectionId} benefits={dealSnapshot.offerBenefits} /> : null;
-            case "offer_formula":
-              return offerOutput && offerSettings
-                ? <OfferFormulaSection key={sectionId} output={offerOutput} settings={offerSettings} /> : null;
             case "offer_ladder":
               return offerOutput ? <OfferLadderSection key={sectionId} output={offerOutput} /> : null;
             case "deal_grade":
-              return offerOutput ? <DealGradeSection key={sectionId} output={offerOutput} /> : null;
-            case "negotiation_plan":
-              return presentationOutput ? <NegotiationPlanSection key={sectionId} plan={presentationOutput} /> : null;
+              return offerOutput ? <SellerDealGradeSection key={sectionId} output={offerOutput} snapshot={dealSnapshot} /> : null;
+            case "deal_terms":
+              return <DealTermsSection key={sectionId} snapshot={dealSnapshot} />;
+            case "apples_to_apples":
+              return <ComparisonSection key={sectionId} snapshot={dealSnapshot} />;
             default:
               return null;
           }
@@ -927,43 +969,6 @@ export default function SharedOfferPage() {
 
         {dealSnapshot.sellerComps && dealSnapshot.sellerComps.length > 0 && (
           <SellerCompsSection comps={dealSnapshot.sellerComps} />
-        )}
-
-        {(dealSnapshot.closingTimeline || dealSnapshot.earnestMoneyDeposit || dealSnapshot.additionalTerms) && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Deal Terms
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {dealSnapshot.closingTimeline && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" /> Closing Timeline
-                    </span>
-                    <span className="font-medium" data-testid="text-closing-timeline">{dealSnapshot.closingTimeline}</span>
-                  </div>
-                )}
-                {dealSnapshot.earnestMoneyDeposit && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <DollarSign className="h-3.5 w-3.5" /> Earnest Money
-                    </span>
-                    <span className="font-medium" data-testid="text-earnest-money">{dealSnapshot.earnestMoneyDeposit}</span>
-                  </div>
-                )}
-                {dealSnapshot.additionalTerms && (
-                  <div className="mt-3 pt-3 border-t">
-                    <p className="text-xs text-muted-foreground mb-1">Additional Terms</p>
-                    <p className="text-sm whitespace-pre-wrap" data-testid="text-additional-terms">{dealSnapshot.additionalTerms}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         )}
 
         {(dealSnapshot.companyPhone || dealSnapshot.companyEmail || dealSnapshot.companyWebsite) && (

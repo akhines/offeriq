@@ -18,10 +18,8 @@ import {
   Home,
   TrendingUp,
   BarChart3,
-  Calculator,
   Layers,
   Award,
-  MessageSquare,
   ExternalLink,
   XCircle,
   Clock,
@@ -29,6 +27,8 @@ import {
   Gift,
   Pencil,
   GripVertical,
+  FileText,
+  Scale,
 } from "lucide-react";
 import type {
   PropertyInfo,
@@ -42,13 +42,13 @@ import type {
 
 export const SHAREABLE_SECTIONS = [
   { id: "property_details", label: "Property Details", description: "Address, beds/baths, sqft, year built", icon: Home },
-  { id: "avm_valuation", label: "AVM / Valuation", description: "Blended value estimate, confidence score", icon: TrendingUp },
-  { id: "comparable_sales", label: "Comparable Sales", description: "Comp table with prices, sqft, distance", icon: BarChart3 },
-  { id: "offer_benefits", label: "Offer Benefits", description: "3 key benefits of accepting your offer", icon: Gift },
-  { id: "offer_formula", label: "Offer Formula", description: "Wholesale calculation breakdown", icon: Calculator },
-  { id: "offer_ladder", label: "Offer Ladder", description: "Fast Yes / Fair / Stretch tiers", icon: Layers },
-  { id: "deal_grade", label: "Deal Grade", description: "A/B/C/D rating with explanation", icon: Award },
-  { id: "negotiation_plan", label: "Negotiation Plan", description: "AI-generated presentation plan", icon: MessageSquare },
+  { id: "deal_grade", label: "Offer Strength", description: "Grade with seller-focused benefits", icon: Award },
+  { id: "deal_terms", label: "Deal Terms", description: "Closing timeline, earnest money, terms", icon: FileText },
+  { id: "apples_to_apples", label: "Compare Your Options", description: "Side-by-side comparison vs. traditional listing", icon: Scale },
+  { id: "offer_benefits", label: "Why This Offer Works", description: "Key benefits of accepting your offer", icon: Gift },
+  { id: "avm_valuation", label: "Property Value Estimate", description: "Estimated market value range", icon: TrendingUp },
+  { id: "comparable_sales", label: "Comparable Sales", description: "Recent sales with prices, sqft, distance", icon: BarChart3 },
+  { id: "offer_ladder", label: "Offer Options", description: "Multiple price tiers to consider", icon: Layers },
 ] as const;
 
 export interface OfferBenefit {
@@ -113,7 +113,7 @@ export function ShareOfferDialog({
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<DialogView>("create");
   const [orderedSections, setOrderedSections] = useState<SectionId[]>(
-    () => ["property_details", "offer_ladder", "deal_grade"]
+    () => ["property_details", "deal_grade", "deal_terms", "apples_to_apples", "offer_benefits"]
   );
   const [expiresIn, setExpiresIn] = useState("7");
   const [isCreating, setIsCreating] = useState(false);
@@ -191,16 +191,16 @@ export function ShareOfferDialog({
         return !!underwritingOutput;
       case "comparable_sales":
         return !!(compsData?.comps?.length || userComps?.comps?.length);
-      case "offer_formula":
-        return !!offerOutput;
       case "offer_ladder":
         return !!offerOutput;
       case "deal_grade":
         return !!offerOutput;
+      case "deal_terms":
+        return true;
+      case "apples_to_apples":
+        return !!(offerOutput || underwritingOutput);
       case "offer_benefits":
         return true;
-      case "negotiation_plan":
-        return !!presentationOutput;
       default:
         return false;
     }

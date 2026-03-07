@@ -99,6 +99,7 @@ Preferred communication style: Simple, everyday language.
 - `client/src/components/offer-calc-section.tsx` - Offer calculation with sliders and ladder
 - `client/src/components/offer-presentation-section.tsx` - AI presentation generator with premium badges
 - `client/src/components/seller-presentation-section.tsx` - Seller-facing customizations with guidance empty state
+- `client/src/pages/shared-offer.tsx` - Public seller-facing shared offer page (fully seller-focused: no investor metrics, margin, spread, or offer formula shown; includes seller-perspective Deal Grade, Apples-to-Apples comparison, and Deal Terms sections)
 - `server/subscriptionGuard.ts` - Tier limit enforcement (deal saves, AI presentations)
 - `capacitor.config.ts` - Capacitor iOS configuration (for App Store build on Mac)
 
