@@ -1,0 +1,115 @@
+I need you to update the OfferIQ seller presentation page so it is fully seller-facing, not investor-facing.
+
+GOAL:
+Refactor the current seller presentation so it explains why the offer is good for the seller, without exposing any internal wholesale, spread, or investor profit logic.
+
+CONTEXT:
+Right now, the seller presentation includes elements like deal grade, margin/spread logic, and offer formula concepts that are useful internally for us, but should not be shown to the seller. The seller version should be framed around seller benefit, simplicity, certainty, and speed.
+
+MAKE THESE CHANGES:
+
+1) REFRAME “DEAL GRADE” FOR THE SELLER
+- Keep the Deal Grade section, but completely change its purpose.
+- It should no longer evaluate the deal based on investor spread, resale potential, or margin.
+- It should evaluate the offer from the seller’s perspective.
+- The section should answer: “Why is this a strong offer for the seller?”
+
+Update the Deal Grade output to focus on things like:
+- certainty of closing
+- speed of closing
+- no repairs required
+- no commissions
+- simplicity of process
+- flexibility of terms
+- reduced hassle
+
+Example style:
+Deal Grade: A
+Why this is a strong offer for you:
+- No repairs needed
+- Fast closing timeline
+- No realtor commissions
+- Clear, simple terms
+- High certainty of closing
+
+2) REMOVE INVESTOR-ONLY METRICS FROM SELLER VIEW
+- Remove or hide all references to:
+  - spread
+  - margin
+  - wholesale fee
+  - investor profit
+  - resale value logic
+  - internal deal math
+  - offer formula / MAO style calculations
+- These can still exist in internal/admin views, but must never render in the seller presentation.
+
+3) MOVE “DEAL TERMS” HIGHER ON THE PAGE
+- Move the Deal Terms section higher in the layout so it appears near the top.
+- The seller should quickly see the actual structure of the offer.
+
+Suggested order:
+1. Offer Summary
+2. Deal Grade (seller perspective)
+3. Deal Terms
+4. Apples-to-Apples Comparison
+5. Why This Offer Works for You
+
+4) REMOVE “OFFER FORMULA” FROM SELLER PRESENTATION
+- If the seller presentation currently shows the offer formula, internal calculations, or logic about how the offer was derived, remove that from the seller-facing page.
+- Replace that area with a seller-friendly comparison section.
+
+5) ADD AN “APPLES-TO-APPLES COMPARISON” SECTION
+- Create a comparison block that helps the seller compare different ways of selling.
+- This should be framed clearly and visually, like a comparison table or cards.
+
+Suggested comparison columns:
+- Option
+- Price
+- Repairs Needed
+- Commissions/Fees
+- Time to Close
+- Certainty
+- Convenience
+
+Example rows:
+- Traditional Listing
+- Cash Offer / Investor Offer
+- Our Offer
+
+The purpose is to help the seller understand tradeoffs, not to pressure them.
+
+6) IMPROVE “WHY THIS OFFER WORKS FOR YOU”
+- Keep this section, but make it more seller-focused and concise.
+- Use bullet points.
+- Emphasize benefits like:
+  - sell as-is
+  - avoid repairs
+  - avoid commissions
+  - flexible timeline
+  - simple process
+  - fewer unknowns
+  - confidence in execution
+
+7) MAINTAIN SEPARATE SELLER VS INTERNAL VIEWS
+- Make sure the seller presentation is cleanly separated from any internal deal analysis view.
+- Internal users can still see spread, profit, and formulas elsewhere.
+- Seller-facing page should only show seller-relevant messaging.
+
+8) UPDATE COPY/TONE
+- Use plain English.
+- Avoid investor jargon.
+- Avoid technical financial language unless it directly helps the seller.
+- Tone should feel clear, helpful, and confidence-building.
+
+IMPLEMENTATION NOTES:
+- Reuse existing data where possible.
+- Do not remove internal calculations from the system entirely; only prevent them from appearing in the seller-facing presentation.
+- If there is already a component structure for sections like Deal Grade, Deal Terms, or Offer Formula, refactor those components rather than rebuilding everything from scratch.
+- Keep the layout polished and presentation-ready for use during live seller conversations.
+
+DELIVERABLE:
+Please update the seller presentation page UI and logic accordingly, and show me:
+1. the revised component structure
+2. the updated rendering logic for seller-facing sections
+3. any conditional logic used to hide internal-only fields
+4. the final seller page layout in order
