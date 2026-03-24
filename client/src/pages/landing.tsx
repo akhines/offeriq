@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  ChevronDown,
 } from "lucide-react";
 
 interface StripeProduct {
@@ -36,11 +37,55 @@ interface StripeProduct {
   }>;
 }
 
+const faqs = [
+  {
+    q: "How do I get started?",
+    a: "Sign up for free — no credit card required. Enter a property address in the Underwriting tab, let OfferIQ pull the AVM estimates and comps, then head to the Offer Calculator to set your profit targets and generate your offer. You can have a full analysis done in under 5 minutes.",
+  },
+  {
+    q: "What does the free trial include?",
+    a: "The free trial gives you full access to all three engines: underwriting, offer calculation, and AI negotiation plans. You can save up to 3 deals and generate 2 AI presentations — enough to fully test the platform before deciding to upgrade.",
+  },
+  {
+    q: "Do I need a credit card to sign up?",
+    a: "No. You can start your free trial without entering any payment information. You only need a credit card when you decide to upgrade to Basic or Premium.",
+  },
+  {
+    q: "How accurate is the property valuation?",
+    a: "OfferIQ blends estimates from multiple AVM sources (Zillow 45%, Redfin 35%, and others at 20%) to produce a weighted valuation with a confidence score. It also pulls real comparable sales from RentCast. For best results, always cross-reference with your local market knowledge.",
+  },
+  {
+    q: "What is the Offer Ladder?",
+    a: "The Offer Ladder gives you three price points: Fast Yes (+8% above your fair price for a quick acceptance), Fair (your baseline calculated offer), and Stretch (-8% below for maximum profit). This helps you adapt your offer strategy based on the seller's motivation.",
+  },
+  {
+    q: "Can I share offers directly with sellers?",
+    a: "Yes. Once you've built your offer, you can generate a shareable link that gives the seller a clean, professional view of the offer package — including deal terms, a comparison table, and the key benefits of accepting. No investor math is shown to the seller.",
+  },
+  {
+    q: "What is the AI Negotiation Plan?",
+    a: "OfferIQ uses OpenAI to generate a personalized negotiation strategy based on the seller's situation. It includes talk tracks, objection handling scripts, and suggested next steps — all grounded in ethical persuasion (no high-pressure tactics).",
+  },
+  {
+    q: "Is my deal data private?",
+    a: "Yes. Your saved deals, offer calculations, and AI plans are private to your account. Shared links are the only way another person can view your deal — and you control when those links expire or get deactivated.",
+  },
+  {
+    q: "What happens when I hit the free trial limit?",
+    a: "When you reach the free trial limits (3 saved deals, 2 AI presentations), you'll see a prompt to upgrade. Your existing deals are not deleted — you can still view and analyze them. Upgrading instantly unlocks higher limits.",
+  },
+  {
+    q: "Can I use OfferIQ on my phone?",
+    a: "Yes — OfferIQ is fully mobile-responsive. You can analyze deals, review comps on the map, and share offers from any device. An iOS app is also in development for even better mobile experience.",
+  },
+];
+
 export default function LandingPage() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
     document.title = "OfferIQ — Underwrite Deals. Build Offers. Close with Confidence.";
@@ -134,8 +179,9 @@ export default function LandingPage() {
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors" data-testid="link-features">Features</a>
+            <a href="#video" className="hover:text-foreground transition-colors" data-testid="link-video">How It Works</a>
             <a href="#pricing" className="hover:text-foreground transition-colors" data-testid="link-pricing">Pricing</a>
-            <a href="#testimonials" className="hover:text-foreground transition-colors" data-testid="link-testimonials">Testimonials</a>
+            <a href="#faq" className="hover:text-foreground transition-colors" data-testid="link-faq">FAQ</a>
           </nav>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -187,12 +233,28 @@ export default function LandingPage() {
                 Pricing
               </a>
               <a
+                href="#video"
+                className="flex items-center min-h-[44px] px-3 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors hover-elevate"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="link-video-mobile"
+              >
+                How It Works
+              </a>
+              <a
                 href="#testimonials"
                 className="flex items-center min-h-[44px] px-3 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors hover-elevate"
                 onClick={() => setMobileMenuOpen(false)}
                 data-testid="link-testimonials-mobile"
               >
                 Testimonials
+              </a>
+              <a
+                href="#faq"
+                className="flex items-center min-h-[44px] px-3 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors hover-elevate"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="link-faq-mobile"
+              >
+                FAQ
               </a>
               <div className="border-t my-2" />
               {isAuthenticated ? (
@@ -288,7 +350,61 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="pricing" className="py-20 bg-card/50">
+      <section id="video" className="py-20 bg-card/50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <Badge variant="secondary" className="mb-3">Quick Start Guide</Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-video-title">
+              Up and Running in 5 Minutes
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Here's exactly how to go from a property address to a ready-to-present offer package.
+            </p>
+          </div>
+
+          <div className="rounded-xl overflow-hidden border shadow-xl" data-testid="product-preview">
+            <img
+              src="/offeriq_preview.png"
+              alt="OfferIQ dashboard showing property analysis, offer ladder, and deal grade"
+              className="w-full object-cover"
+              data-testid="img-product-preview"
+            />
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { step: "1", label: "Enter an address", desc: "Pull real AVM estimates and comparable sales in seconds." },
+              { step: "2", label: "Run the analysis", desc: "Get confidence-weighted valuations, repair estimates, and deal grade." },
+              { step: "3", label: "Build & share your offer", desc: "Generate a 3-tier offer ladder and send the seller a professional link." },
+            ].map((s) => (
+              <div key={s.step} className="flex gap-4 p-4 rounded-lg border bg-card">
+                <div className="h-9 w-9 rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
+                  {s.step}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm mb-1">{s.label}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
+            {[
+              { icon: Zap, text: "No setup needed" },
+              { icon: Check, text: "Free trial — no credit card" },
+              { icon: TrendingUp, text: "Real AVM data from day one" },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <item.icon className="h-4 w-4 text-[hsl(var(--primary))]" />
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-pricing-title">Simple, Transparent Pricing</h2>
@@ -410,6 +526,43 @@ export default function LandingPage() {
                   <p className="text-xs text-muted-foreground">{t.role}</p>
                 </div>
               </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" className="py-20 bg-card/50">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-faq-title">Frequently Asked Questions</h2>
+            <p className="text-muted-foreground text-lg">
+              Everything you need to know before getting started.
+            </p>
+          </div>
+          <div className="space-y-2" data-testid="faq-list">
+            {faqs.map((faq, i) => (
+              <div
+                key={i}
+                className="border rounded-lg overflow-hidden"
+                data-testid={`faq-item-${i}`}
+              >
+                <button
+                  className="w-full flex items-center justify-between px-5 py-4 text-left gap-4 hover:bg-muted/40 transition-colors min-h-[52px]"
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  aria-expanded={openFaq === i}
+                  data-testid={`faq-toggle-${i}`}
+                >
+                  <span className="font-medium text-sm sm:text-base">{faq.q}</span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${openFaq === i ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-4 text-sm text-muted-foreground leading-relaxed border-t bg-muted/20 pt-3" data-testid={`faq-answer-${i}`}>
+                    {faq.a}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
