@@ -172,20 +172,34 @@ export function UnderwritingSection({
       });
 
       if (data.estimatedValue) {
-        const rentcastAVMs = [];
+        const avmSources = [];
         if (data.estimatedValue) {
-          rentcastAVMs.push({ name: "RentCast Estimate", value: data.estimatedValue });
+          avmSources.push({ name: "RentCast Estimate", value: data.estimatedValue });
         }
         if (data.priceRangeLow) {
-          rentcastAVMs.push({ name: "RentCast Low", value: data.priceRangeLow });
+          avmSources.push({ name: "RentCast Low", value: data.priceRangeLow });
         }
         if (data.priceRangeHigh) {
-          rentcastAVMs.push({ name: "RentCast High", value: data.priceRangeHigh });
+          avmSources.push({ name: "RentCast High", value: data.priceRangeHigh });
         }
-        
+        // Add Bright MLS last sale as an additional valuation data point
+        if (data.brightMLSLastSale) {
+          avmSources.push({ name: "Bright MLS Last Sale", value: data.brightMLSLastSale });
+        }
+
         onAVMChange({
           ...avmBaselines,
-          otherAVMs: rentcastAVMs.length > 0 ? rentcastAVMs : avmBaselines.otherAVMs,
+          otherAVMs: avmSources.length > 0 ? avmSources : avmBaselines.otherAVMs,
+        });
+      }
+
+      // Auto-populate tax records and last sale from Bright MLS
+      if (data.taxAssessedValue || data.lastSalePrice) {
+        onPublicInfoChange({
+          ...publicInfo,
+          taxAssessedValue: data.taxAssessedValue || publicInfo.taxAssessedValue,
+          lastSalePrice: data.lastSalePrice || publicInfo.lastSalePrice,
+          lastSaleDate: data.lastSaleDate || publicInfo.lastSaleDate,
         });
       }
 
@@ -199,9 +213,10 @@ export function UnderwritingSection({
 
       fetchComps(property.address, mapPropertyType(data.propertyType));
 
+      const sources = data.brightMLSDataAvailable ? "RentCast + Bright MLS" : "RentCast";
       toast({
         title: "Property Data Loaded",
-        description: `Found data for ${data.address || property.address}`,
+        description: `Found data for ${data.address || property.address} (${sources})`,
       });
     } catch (error) {
       toast({
@@ -636,88 +651,6 @@ export function UnderwritingSection({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Seller Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="timeline">Timeline to Sell</Label>
-              <Select
-                value={seller.timelineToSell || ""}
-                onValueChange={(value) => onSellerChange({ ...seller, timelineToSell: value })}
-              >
-                <SelectTrigger data-testid="select-timeline">
-                  <SelectValue placeholder="Select timeline" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ASAP">ASAP (within 2 weeks)</SelectItem>
-                  <SelectItem value="30 days">Within 30 days</SelectItem>
-                  <SelectItem value="60 days">Within 60 days</SelectItem>
-                  <SelectItem value="90+ days">90+ days / Flexible</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="reason">Reason for Selling</Label>
-              <Textarea
-                id="reason"
-                data-testid="input-reason"
-                value={seller.reasonForSelling || ""}
-                onChange={(e) => onSellerChange({ ...seller, reasonForSelling: e.target.value })}
-                placeholder="Relocating, inherited, financial..."
-                rows={2}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="owed">Amount Owed</Label>
-                <Input
-                  id="owed"
-                  type="number"
-                  data-testid="input-owed"
-                  value={seller.owed || ""}
-                  onChange={(e) => onSellerChange({ ...seller, owed: Number(e.target.value) || undefined })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="piti">Monthly PITI</Label>
-                <Input
-                  id="piti"
-                  type="number"
-                  data-testid="input-piti"
-                  value={seller.pitiMonthly || ""}
-                  onChange={(e) => onSellerChange({ ...seller, pitiMonthly: Number(e.target.value) || undefined })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="neededProfit">Seller Needs to Walk Away With</Label>
-                <Input
-                  id="neededProfit"
-                  type="number"
-                  data-testid="input-needed-profit"
-                  value={seller.neededProfit || ""}
-                  onChange={(e) => onSellerChange({ ...seller, neededProfit: Number(e.target.value) || undefined })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="sellerARV">Seller's Value Estimate</Label>
-                <Input
-                  id="sellerARV"
-                  type="number"
-                  data-testid="input-seller-arv"
-                  value={seller.sellerThinksAs10Value || ""}
-                  onChange={(e) => onSellerChange({ ...seller, sellerThinksAs10Value: Number(e.target.value) || undefined })}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="space-y-6">

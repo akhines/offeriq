@@ -8,7 +8,6 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UnderwritingSection } from "@/components/underwriting-section";
 import { OfferCalcSection } from "@/components/offer-calc-section";
-import { OfferPresentationSection } from "@/components/offer-presentation-section";
 import { SellerPresentationSection } from "@/components/seller-presentation-section";
 import { calculateUnderwriting } from "@/lib/engines/underwriting";
 import { calculateOfferOutput } from "@/lib/engines/offer-calculation";
@@ -28,7 +27,6 @@ import {
 import {
   FileText,
   Calculator,
-  Presentation,
   Save,
   FolderOpen,
   Plus,
@@ -41,7 +39,6 @@ import {
   CheckCircle2,
   Search,
   BarChart3,
-  MessageSquare,
   Share2,
   Crown,
 } from "lucide-react";
@@ -51,7 +48,6 @@ import type {
   PublicInfo,
   AVMBaselines,
   OfferSettings,
-  PresentationInput,
   SellerPresentationSettings,
   UnderwritingOutput,
   OfferOutput,
@@ -355,10 +351,6 @@ export default function OfferIQ() {
     setState((s) => ({ ...s, offerSettings }));
   }, []);
 
-  const handlePresentationInputChange = useCallback((presentationInput: PresentationInput) => {
-    setState((s) => ({ ...s, presentationInput }));
-  }, []);
-
   const handleSellerPresentationChange = useCallback((sellerPresentation: SellerPresentationSettings) => {
     setState((s) => ({ ...s, sellerPresentation }));
   }, []);
@@ -445,11 +437,6 @@ export default function OfferIQ() {
       icon: Calculator,
       title: "Engine 2: Offer Calculator",
       description: "Set your investment strategy and fee structure. The offer engine generates investor buy prices, seller offers, deal grades, and a multi-tier offer ladder.",
-    },
-    {
-      icon: MessageSquare,
-      title: "Engine 3: AI Presentation Plan",
-      description: "Get an AI-generated negotiation strategy with talking points, objection handling, and a recommended offer tier tailored to the seller's situation.",
     },
     {
       icon: Share2,
@@ -549,7 +536,7 @@ export default function OfferIQ() {
             <FileText className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-bold">OfferIQ</h1>
             <Badge variant="secondary" className="text-xs hidden sm:inline-flex">
-              3-Engine Underwriter
+              Deal Underwriter
             </Badge>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
@@ -663,7 +650,7 @@ export default function OfferIQ() {
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <Tabs defaultValue="underwriting" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
             <TabsTrigger value="underwriting" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-underwriting">
               <FileText className="h-4 w-4 shrink-0" />
               <span className="text-[11px] sm:text-sm truncate">Underwrite</span>
@@ -671,10 +658,6 @@ export default function OfferIQ() {
             <TabsTrigger value="offer" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-offer">
               <Calculator className="h-4 w-4 shrink-0" />
               <span className="text-[11px] sm:text-sm truncate">Offer</span>
-            </TabsTrigger>
-            <TabsTrigger value="presentation" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-presentation">
-              <Presentation className="h-4 w-4 shrink-0" />
-              <span className="text-[11px] sm:text-sm truncate">AI Plan</span>
             </TabsTrigger>
             <TabsTrigger value="seller" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="tab-seller-presentation">
               <Eye className="h-4 w-4 shrink-0" />
@@ -714,25 +697,6 @@ export default function OfferIQ() {
             />
           </TabsContent>
 
-          <TabsContent value="presentation" className="mt-6">
-            <OfferPresentationSection
-              seller={state.seller}
-              property={state.property}
-              presentationInput={state.presentationInput}
-              presentationOutput={presentationOutput}
-              offerOutput={offerOutput}
-              underwritingOutput={underwritingOutput}
-              offerSettings={state.offerSettings}
-              propertyAddress={state.property.address}
-              manualARV={manualARV}
-              manualRepairs={manualRepairs}
-              onPresentationInputChange={handlePresentationInputChange}
-              onPresentationOutputChange={setPresentationOutput}
-              onPdfUrlChange={setPresentationPdfUrl}
-              userTier={(user as any)?.subscriptionTier || "free"}
-            />
-          </TabsContent>
-
           <TabsContent value="seller" className="mt-6">
             <SellerPresentationSection
               settings={state.sellerPresentation}
@@ -746,7 +710,7 @@ export default function OfferIQ() {
 
       <footer className="border-t mt-12">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-12 flex items-center justify-between text-sm text-muted-foreground">
-          <span>OfferIQ - 3-Engine Real Estate Underwriter</span>
+          <span>OfferIQ - Real Estate Deal Underwriter</span>
           <span className="hidden sm:inline">Data auto-saves locally</span>
         </div>
       </footer>

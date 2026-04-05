@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { callLLM, callLLMWithJSON } from "./lib/llm";
+import * as brightMLS from "./lib/bright-mls";
 import { aiQuestionRequestSchema, aiNegotiationRequestSchema, compsRequestSchema, questionsConfig, createPresentationSchema, type NegotiationPlan, type CompsData, type ComparableSale, savedDeals, insertSavedDealSchema, savedPresentations, userPreferences, users, sharedOffers, analyticsEvents, feedback, insertFeedbackSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
@@ -11,6 +12,11 @@ import { randomUUID } from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { checkDealSaveLimit, checkAiPresentationLimit, getUserTier, TIER_LIMITS, type SubscriptionTier } from "./subscriptionGuard";
+
+/** Normalize address for dedup: strip punctuation, lowercase, collapse whitespace */
+function normalizeCompAddress(addr: string): string {
+  return addr.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -348,24 +354,30 @@ Generate a JSON response with this structure:
       }
 
       const encodedAddress = encodeURIComponent(address);
-      
-      // Call both AVM and Property Records endpoints in parallel
+
+      // Call RentCast AVM, RentCast Property Records, and Bright MLS in parallel
       const valuationUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}`;
       const propertyRecordsUrl = `https://api.rentcast.io/v1/properties?address=${encodedAddress}`;
-      
-      const [avmResponse, recordsResponse] = await Promise.all([
+
+      const [avmResponse, recordsResponse, brightData] = await Promise.all([
         fetch(valuationUrl, {
           headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
         }),
         fetch(propertyRecordsUrl, {
           headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
-        }).catch(() => null) // Don't fail if property records unavailable
+        }).catch(() => null), // Don't fail if property records unavailable
+        brightMLS.isBrightMLSConfigured()
+          ? brightMLS.lookupProperty(address).catch((err) => {
+              console.error("Bright MLS lookup failed (non-fatal):", err);
+              return null;
+            })
+          : Promise.resolve(null),
       ]);
 
       if (!avmResponse.ok) {
         const errorText = await avmResponse.text();
         console.error("RentCast AVM API error:", avmResponse.status, errorText);
-        
+
         if (avmResponse.status === 401) {
           return res.status(401).json({ error: "Invalid API key" });
         }
@@ -376,38 +388,46 @@ Generate a JSON response with this structure:
       }
 
       const avmData = await avmResponse.json();
-      
+
       // Try to get property details from the records endpoint
       let recordsData: any = null;
       if (recordsResponse && recordsResponse.ok) {
         recordsData = await recordsResponse.json();
         console.log("RentCast Property Records response:", JSON.stringify(recordsData, null, 2));
       }
-      
+
       // Property records may return an array or single object
       const propertyRecord = Array.isArray(recordsData) ? recordsData[0] : recordsData;
-      
+
       // Generate Redfin link using their keyword search URL format
-      // This opens Redfin's search with the address as a keyword search
       const redfinLink = `https://www.redfin.com/search?keyword=${encodeURIComponent(address)}`;
-      
+
+      // Merge data: Bright MLS > RentCast Records > RentCast AVM (priority order for property details)
       const propertyData = {
         address: avmData.subjectProperty?.formattedAddress || avmData.formattedAddress || address,
         estimatedValue: avmData.price || avmData.priceRangeLow || 0,
         priceRangeLow: avmData.priceRangeLow || 0,
         priceRangeHigh: avmData.priceRangeHigh || 0,
-        // Get property details from records endpoint (preferred) or AVM response
-        sqft: propertyRecord?.squareFootage || avmData.squareFootage || 0,
-        bedrooms: propertyRecord?.bedrooms || avmData.bedrooms || 0,
-        bathrooms: propertyRecord?.bathrooms || avmData.bathrooms || 0,
-        yearBuilt: propertyRecord?.yearBuilt || avmData.yearBuilt || 0,
+        sqft: brightData?.sqft || propertyRecord?.squareFootage || avmData.squareFootage || 0,
+        bedrooms: brightData?.beds || propertyRecord?.bedrooms || avmData.bedrooms || 0,
+        bathrooms: brightData?.baths || propertyRecord?.bathrooms || avmData.bathrooms || 0,
+        yearBuilt: brightData?.yearBuilt || propertyRecord?.yearBuilt || avmData.yearBuilt || 0,
         propertyType: propertyRecord?.propertyType || avmData.propertyType || "Single Family",
-        lotSize: propertyRecord?.lotSize || avmData.lotSize || 0,
-        pricePerSqft: (propertyRecord?.squareFootage || avmData.squareFootage) 
-          ? Math.round((avmData.price || 0) / (propertyRecord?.squareFootage || avmData.squareFootage)) 
+        lotSize: brightData?.lotSize || propertyRecord?.lotSize || avmData.lotSize || 0,
+        pricePerSqft: (brightData?.sqft || propertyRecord?.squareFootage || avmData.squareFootage)
+          ? Math.round((avmData.price || 0) / (brightData?.sqft || propertyRecord?.squareFootage || avmData.squareFootage))
           : 0,
         zillowLink: `https://www.zillow.com/homes/${encodeURIComponent(address.replace(/,/g, '').replace(/\s+/g, '-'))}_rb/`,
-        redfinLink: redfinLink
+        redfinLink: redfinLink,
+        // Bright MLS enrichment: tax records and last sale (auto-populates PublicInfo)
+        taxAssessedValue: brightData?.taxAssessedValue || null,
+        taxAnnualAmount: brightData?.taxAnnualAmount || null,
+        taxYear: brightData?.taxYear || null,
+        lastSalePrice: brightData?.lastSalePrice || null,
+        lastSaleDate: brightData?.lastSaleDate || null,
+        // Bright MLS AVM source (last closed sale price as an additional valuation point)
+        brightMLSLastSale: brightData?.lastSalePrice || null,
+        brightMLSDataAvailable: !!brightData,
       };
 
       res.json(propertyData);
@@ -440,18 +460,35 @@ Generate a JSON response with this structure:
       const encodedAddress = encodeURIComponent(address);
       // Use AVM endpoint which includes comparables in response
       const compsUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}&compCount=15`;
-      
-      const response = await fetch(compsUrl, {
-        headers: {
-          "X-Api-Key": apiKey,
-          "Accept": "application/json"
-        }
-      });
+
+      // Parse ZIP from address for Bright MLS query
+      const zipMatch = address.match(/\b(\d{5})\b/);
+      const zip = zipMatch?.[1];
+
+      // Fetch RentCast comps and Bright MLS comps in parallel
+      const [response, brightComps] = await Promise.all([
+        fetch(compsUrl, {
+          headers: { "X-Api-Key": apiKey, "Accept": "application/json" },
+        }),
+        (brightMLS.isBrightMLSConfigured() && zip)
+          ? brightMLS.fetchComps({
+              zip,
+              propertyType,
+              beds: req.body.beds,
+              sqft: req.body.sqft,
+              latitude: req.body.latitude,
+              longitude: req.body.longitude,
+            }).catch((err) => {
+              console.error("Bright MLS comps failed (non-fatal):", err);
+              return [] as brightMLS.BrightComp[];
+            })
+          : Promise.resolve([] as brightMLS.BrightComp[]),
+      ]);
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("RentCast API error:", response.status, errorText);
-        
+
         if (response.status === 401) {
           return res.status(401).json({ error: "Invalid API key" });
         }
@@ -462,8 +499,9 @@ Generate a JSON response with this structure:
       }
 
       const data = await response.json();
-      
-      const comps: ComparableSale[] = (data.comparables || []).map((comp: any) => ({
+
+      // Map RentCast comps
+      const rentCastComps: ComparableSale[] = (data.comparables || []).map((comp: any) => ({
         address: comp.formattedAddress || comp.address || "Unknown",
         price: comp.price || comp.lastSalePrice || 0,
         sqft: comp.squareFootage || 0,
@@ -480,16 +518,54 @@ Generate a JSON response with this structure:
         correlation: comp.correlation || undefined,
       }));
 
+      // Map Bright MLS comps into the same shape
+      const brightCompsNormalized: ComparableSale[] = brightComps.map((bc) => ({
+        address: bc.address,
+        price: bc.price,
+        sqft: bc.sqft,
+        pricePerSqft: bc.pricePerSqft,
+        bedrooms: bc.bedrooms,
+        bathrooms: bc.bathrooms,
+        yearBuilt: bc.yearBuilt || 0,
+        soldDate: bc.soldDate,
+        distanceMiles: bc.distanceMiles,
+        daysOnMarket: bc.daysOnMarket || undefined,
+        propertyType: bc.propertyType,
+        latitude: bc.latitude || undefined,
+        longitude: bc.longitude || undefined,
+      }));
+
+      // Merge and deduplicate comps (prefer Bright MLS data when addresses overlap)
+      const seenAddresses = new Set<string>();
+      const mergedComps: ComparableSale[] = [];
+
+      // Bright MLS comps first (higher quality MLS data)
+      for (const comp of brightCompsNormalized) {
+        const key = normalizeCompAddress(comp.address);
+        if (!seenAddresses.has(key) && comp.price > 0 && comp.sqft > 0) {
+          seenAddresses.add(key);
+          mergedComps.push(comp);
+        }
+      }
+
+      // Then RentCast comps (fill remaining slots)
+      for (const comp of rentCastComps) {
+        const key = normalizeCompAddress(comp.address);
+        if (!seenAddresses.has(key) && comp.price > 0 && comp.sqft > 0) {
+          seenAddresses.add(key);
+          mergedComps.push(comp);
+        }
+      }
+
       // Filter by property type if specified
-      let filteredComps = comps.filter(c => c.price > 0 && c.sqft > 0);
-      
+      let filteredComps = mergedComps;
+
       if (propertyType) {
         const normalizedType = propertyType.toLowerCase().replace(/_/g, " ");
-        filteredComps = filteredComps.filter(c => {
+        const typeFiltered = filteredComps.filter(c => {
           if (!c.propertyType) return false;
           const compType = c.propertyType.toLowerCase().replace(/_/g, " ");
-          // Match property types flexibly
-          if (normalizedType.includes("single") && compType.includes("single")) return true;
+          if (normalizedType.includes("single") && (compType.includes("single") || compType.includes("residential"))) return true;
           if (normalizedType.includes("multi") && compType.includes("multi")) return true;
           if (normalizedType.includes("condo") && compType.includes("condo")) return true;
           if (normalizedType.includes("townhouse") && (compType.includes("town") || compType.includes("row"))) return true;
@@ -497,27 +573,27 @@ Generate a JSON response with this structure:
           if (normalizedType.includes("commercial") && compType.includes("commercial")) return true;
           return compType.includes(normalizedType) || normalizedType.includes(compType);
         });
-        
-        // If no matches after filtering, fall back to all valid comps with a note
-        if (filteredComps.length === 0) {
+
+        if (typeFiltered.length > 0) {
+          filteredComps = typeFiltered;
+        } else {
           console.log(`No ${propertyType} comps found, using all property types`);
-          filteredComps = comps.filter(c => c.price > 0 && c.sqft > 0);
         }
       }
-      
+
       const validComps = filteredComps;
       const prices = validComps.map(c => c.price);
       const pricesPerSqft = validComps.map(c => c.pricePerSqft);
-      
-      const avgPricePerSqft = pricesPerSqft.length > 0 
-        ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length) 
+
+      const avgPricePerSqft = pricesPerSqft.length > 0
+        ? Math.round(pricesPerSqft.reduce((a, b) => a + b, 0) / pricesPerSqft.length)
         : 0;
-      
+
       const sortedPrices = [...prices].sort((a, b) => a - b);
       const medianPrice = sortedPrices.length > 0
         ? sortedPrices[Math.floor(sortedPrices.length / 2)]
         : 0;
-      
+
       const suggestedARV = validComps.length >= 3
         ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
         : medianPrice;
@@ -540,7 +616,7 @@ Generate a JSON response with this structure:
         } : undefined,
         avgPricePerSqft,
         medianPrice,
-        suggestedARV: avmSuggestedARV
+        suggestedARV: avmSuggestedARV,
       };
 
       res.json(compsData);
