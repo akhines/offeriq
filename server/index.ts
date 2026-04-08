@@ -187,6 +187,20 @@ app.use((req, res, next) => {
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  // Start deal prep cron (runs 2x daily, fully autonomous)
+  const { startDealPrepCron, runDealPrepCycle } = await import("./deal-prep-cron");
+  startDealPrepCron();
+
+  // Manual trigger endpoint (protected by API key)
+  app.post("/api/cron/deal-prep", async (req, res) => {
+    const apiKey = req.headers["x-api-key"] as string;
+    if (!apiKey || apiKey !== process.env.OFFERIQ_API_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    runDealPrepCycle().catch(err => console.error("[DealPrep] Manual trigger error:", err));
+    res.json({ message: "Deal prep cycle triggered" });
+  });
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, req: Request, res: Response, _next: NextFunction) => {

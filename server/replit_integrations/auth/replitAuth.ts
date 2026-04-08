@@ -146,12 +146,18 @@ async function ensureAgentUser() {
   if (agentUserEnsured) return;
   try {
     const { authStorage } = await import("./storage");
-    await authStorage.upsertUser({
-      id: AGENT_SERVICE_ACCOUNT.id,
-      email: AGENT_SERVICE_ACCOUNT.email,
-      firstName: AGENT_SERVICE_ACCOUNT.firstName,
-      lastName: AGENT_SERVICE_ACCOUNT.lastName,
-    });
+    const existing = await authStorage.getUserByEmail(AGENT_SERVICE_ACCOUNT.email);
+    if (!existing) {
+      const bcryptMod = await import("bcryptjs");
+      const passwordHash = await bcryptMod.hash(process.env.AGENT_PASSWORD || "ImpactHomeTeam2026!", 10);
+      await authStorage.upsertUser({
+        id: AGENT_SERVICE_ACCOUNT.id,
+        email: AGENT_SERVICE_ACCOUNT.email,
+        passwordHash,
+        firstName: AGENT_SERVICE_ACCOUNT.firstName,
+        lastName: AGENT_SERVICE_ACCOUNT.lastName,
+      });
+    }
     agentUserEnsured = true;
   } catch (err) {
     console.error("Failed to ensure agent service account:", err);
