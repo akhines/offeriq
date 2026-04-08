@@ -268,8 +268,6 @@ export async function fetchComps(options: {
     `StandardStatus eq 'Closed'`,
     `PostalCode eq '${escapeOData(zip)}'`,
     `CloseDate ge ${cutoffStr}`,
-    `ClosePrice gt 0`,
-    `LivingArea gt 0`,
   ];
 
   // Match property type if available
@@ -278,20 +276,6 @@ export async function fetchComps(options: {
     if (brightType) {
       filterParts.push(`PropertyType eq '${escapeOData(brightType)}'`);
     }
-  }
-
-  // Narrow by bedroom count (+/- 1) for better comps
-  if (beds && beds > 0) {
-    filterParts.push(`BedroomsTotal ge ${Math.max(1, beds - 1)}`);
-    filterParts.push(`BedroomsTotal le ${beds + 1}`);
-  }
-
-  // Narrow by sqft (+/- 30%) for better comps
-  if (sqft && sqft > 0) {
-    const sqftLow = Math.round(sqft * 0.7);
-    const sqftHigh = Math.round(sqft * 1.3);
-    filterParts.push(`LivingArea ge ${sqftLow}`);
-    filterParts.push(`LivingArea le ${sqftHigh}`);
   }
 
   const selectFields = [
