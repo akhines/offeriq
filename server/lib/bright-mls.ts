@@ -73,8 +73,11 @@ async function queryBright(resource: string, params: Record<string, string>): Pr
   const token = await getAccessToken();
   const { baseUrl } = getConfig();
 
-  const searchParams = new URLSearchParams(params);
-  const url = `${baseUrl}/${resource}?${searchParams.toString()}`;
+  // Build URL manually — URLSearchParams double-encodes OData $filter syntax
+  const queryParts = Object.entries(params).map(
+    ([k, v]) => `${k}=${encodeURIComponent(v)}`
+  );
+  const url = `${baseUrl}/${resource}?${queryParts.join("&")}`;
 
   const response = await fetch(url, {
     headers: {
