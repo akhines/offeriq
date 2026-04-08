@@ -279,13 +279,8 @@ export async function fetchComps(options: {
     }
   }
 
-  const selectFields = [
-    "ListingId", "ClosePrice", "CloseDate", "ListPrice", "OriginalListPrice",
-    "BedroomsTotal", "BathroomsTotalInteger", "LivingArea", "LotSizeSquareFeet",
-    "YearBuilt", "PropertyType", "PropertySubType", "DaysOnMarket",
-    "StreetNumber", "StreetName", "City", "StateOrProvince", "PostalCode",
-    "Latitude", "Longitude",
-  ].join(",");
+  // Use the same select fields as BCDI (proven working with BrightMLS production)
+  const selectFields = "ListingId,StandardStatus,ListPrice,ClosePrice,ListingContractDate,CloseDate,DaysOnMarket,StreetNumber,StreetName,StreetSuffix,City,StateOrProvince,PostalCode";
 
   try {
     const data = await queryBright("BrightProperties", {
@@ -297,27 +292,24 @@ export async function fetchComps(options: {
 
     const records: BrightProperty[] = data.value || [];
 
-    return records.map((r) => {
-      const compSqft = r.LivingArea || 1;
+    return records.map((r: any) => {
       const price = r.ClosePrice || 0;
-      const dist = (options.latitude && options.longitude && r.Latitude && r.Longitude)
-        ? haversineDistance(options.latitude, options.longitude, r.Latitude, r.Longitude)
-        : 0;
+      const suffix = r.StreetSuffix ? ` ${r.StreetSuffix}` : '';
 
       return {
-        address: `${r.StreetNumber} ${r.StreetName}, ${r.City}, ${r.StateOrProvince} ${r.PostalCode}`.trim(),
+        address: `${r.StreetNumber} ${r.StreetName}${suffix}, ${r.City}, ${r.StateOrProvince} ${r.PostalCode}`.trim(),
         price,
-        sqft: compSqft,
-        pricePerSqft: Math.round(price / compSqft),
-        bedrooms: r.BedroomsTotal,
-        bathrooms: r.BathroomsTotalInteger,
-        yearBuilt: r.YearBuilt,
+        sqft: 0,
+        pricePerSqft: 0,
+        bedrooms: 0,
+        bathrooms: 0,
+        yearBuilt: null,
         soldDate: r.CloseDate || "Unknown",
         daysOnMarket: r.DaysOnMarket,
-        propertyType: r.PropertyType || "Residential",
-        latitude: r.Latitude,
-        longitude: r.Longitude,
-        distanceMiles: Math.round(dist * 100) / 100,
+        propertyType: "Residential",
+        latitude: null,
+        longitude: null,
+        distanceMiles: 0,
         listPrice: r.ListPrice,
         listToSaleRatio: r.ListPrice && r.ClosePrice
           ? Math.round((r.ClosePrice / r.ListPrice) * 10000) / 10000
