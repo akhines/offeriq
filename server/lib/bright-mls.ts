@@ -85,6 +85,7 @@ async function queryBright(resource: string, params: Record<string, string>): Pr
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
+      "User-Agent": "Bright WebAPI/1.0",
     },
   });
 
