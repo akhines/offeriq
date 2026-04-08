@@ -732,7 +732,8 @@ export default function SharedOfferPage() {
   useEffect(() => {
     const fetchShare = async () => {
       try {
-        const res = await fetch(`/api/s/${params.code}`);
+        const apiBase = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiBase}/api/s/${params.code}`);
         if (!res.ok) {
           const err = await res.json();
           setError(err.error || "Failed to load offer");
