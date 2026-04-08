@@ -165,6 +165,7 @@ export interface BrightComp {
   soldDate: string;
   daysOnMarket: number | null;
   propertyType: string;
+  structureType: string | null;
   latitude: number | null;
   longitude: number | null;
   distanceMiles: number;
@@ -268,6 +269,7 @@ export async function lookupProperty(
 export async function fetchComps(options: {
   zip: string;
   propertyType?: string;
+  structureType?: string; // "Detached" for SFH, "Interior Row/Townhouse", "End of Row/Townhouse", "Twin/Semi-Detached"
   beds?: number;
   baths?: number;
   sqft?: number;
@@ -297,7 +299,12 @@ export async function fetchComps(options: {
     }
   }
 
-  const selectFields = "ListingId,StandardStatus,ListPrice,ClosePrice,ListingContractDate,CloseDate,DaysOnMarket,StreetNumber,StreetName,StreetSuffix,City,StateOrProvince,PostalCode,BedroomsTotal,BathroomsTotalInteger,LivingArea,LotSizeSquareFeet,YearBuilt,PropertyType,PropertySubType,Latitude,Longitude";
+  // Filter by structure type: Detached = SFH, excludes townhouses/condos/duplexes
+  if (options.structureType) {
+    filterParts.push(`StructureDesignType eq '${escapeOData(options.structureType)}'`);
+  }
+
+  const selectFields = "ListingId,StandardStatus,ListPrice,ClosePrice,ListingContractDate,CloseDate,DaysOnMarket,StreetNumber,StreetName,StreetSuffix,City,StateOrProvince,PostalCode,BedroomsTotal,BathroomsTotalInteger,LivingArea,LotSizeSquareFeet,YearBuilt,PropertyType,PropertySubType,StructureDesignType,Latitude,Longitude";
 
   try {
     const data = await queryBright("BrightProperties", {
@@ -329,6 +336,7 @@ export async function fetchComps(options: {
         soldDate: r.CloseDate || "Unknown",
         daysOnMarket: r.DaysOnMarket,
         propertyType: r.PropertyType || "Residential",
+        structureType: r.StructureDesignType || null,
         latitude: r.Latitude || null,
         longitude: r.Longitude || null,
         distanceMiles: Math.round(dist * 100) / 100,

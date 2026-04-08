@@ -468,6 +468,7 @@ Generate a JSON response with this structure:
       const brightComps = await brightMLS.fetchComps({
         zip,
         propertyType,
+        structureType: req.body.structureType,
         beds: req.body.beds,
         sqft: req.body.sqft,
         latitude: req.body.latitude,
