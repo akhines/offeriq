@@ -274,10 +274,10 @@ export async function fetchComps(options: {
   cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
   const cutoffStr = cutoffDate.toISOString().split("T")[0];
 
-  // Try Active+Pending+Closed to see what data is accessible
   const filterParts: string[] = [
-    `(StandardStatus eq 'Closed' or StandardStatus eq 'Active' or StandardStatus eq 'Pending')`,
+    `StandardStatus eq 'Closed'`,
     `PostalCode eq '${escapeOData(zip)}'`,
+    `CloseDate ge ${cutoffStr}`,
   ];
 
   // Match property type if available
@@ -288,8 +288,7 @@ export async function fetchComps(options: {
     }
   }
 
-  // Use the same select fields as BCDI (proven working with BrightMLS production)
-  const selectFields = "ListingId,StandardStatus,ListPrice,ClosePrice,ListingContractDate,CloseDate,DaysOnMarket,StreetNumber,StreetName,StreetSuffix,City,StateOrProvince,PostalCode";
+  const selectFields = "ListingId,StandardStatus,ListPrice,ClosePrice,ListingContractDate,CloseDate,DaysOnMarket,StreetNumber,StreetName,StreetSuffix,City,StateOrProvince,PostalCode,BedroomsTotal,BathroomsTotalInteger,LivingArea,LotSizeSquareFeet,YearBuilt,PropertyType,PropertySubType,Latitude,Longitude";
 
   try {
     const data = await queryBright("BrightProperties", {
@@ -303,22 +302,26 @@ export async function fetchComps(options: {
 
     return records.map((r: any) => {
       const price = r.ClosePrice || 0;
+      const compSqft = r.LivingArea || 0;
       const suffix = r.StreetSuffix ? ` ${r.StreetSuffix}` : '';
+      const dist = (options.latitude && options.longitude && r.Latitude && r.Longitude)
+        ? haversineDistance(options.latitude, options.longitude, r.Latitude, r.Longitude)
+        : 0;
 
       return {
         address: `${r.StreetNumber} ${r.StreetName}${suffix}, ${r.City}, ${r.StateOrProvince} ${r.PostalCode}`.trim(),
         price,
-        sqft: 0,
-        pricePerSqft: 0,
-        bedrooms: 0,
-        bathrooms: 0,
-        yearBuilt: null,
+        sqft: compSqft,
+        pricePerSqft: compSqft > 0 ? Math.round(price / compSqft) : 0,
+        bedrooms: r.BedroomsTotal || 0,
+        bathrooms: r.BathroomsTotalInteger || 0,
+        yearBuilt: r.YearBuilt || null,
         soldDate: r.CloseDate || "Unknown",
         daysOnMarket: r.DaysOnMarket,
-        propertyType: "Residential",
-        latitude: null,
-        longitude: null,
-        distanceMiles: 0,
+        propertyType: r.PropertyType || "Residential",
+        latitude: r.Latitude || null,
+        longitude: r.Longitude || null,
+        distanceMiles: Math.round(dist * 100) / 100,
         listPrice: r.ListPrice,
         listToSaleRatio: r.ListPrice && r.ClosePrice
           ? Math.round((r.ClosePrice / r.ListPrice) * 10000) / 10000
