@@ -255,7 +255,15 @@ export async function lookupProperty(
 
 /**
  * Pull closed sales near a given property for comp analysis.
- * Searches by ZIP code + property type within the last 12 months.
+ *
+ * Strategy: Pull a broad set from BrightMLS (ZIP-wide, 12 months, up to 200),
+ * then apply tiered radius + time filters in code:
+ *   Tier 1: 0.5 miles, 180 days
+ *   Tier 2: 1 mile, 240 days
+ *   Tier 3: ZIP-wide, 360 days
+ *
+ * Returns the tightest tier that has >= 3 comps (minComps).
+ * If lat/long not provided, skips radius filtering and uses time tiers only.
  */
 export async function fetchComps(options: {
   zip: string;
@@ -267,9 +275,11 @@ export async function fetchComps(options: {
   longitude?: number;
   maxResults?: number;
   monthsBack?: number;
+  minComps?: number;
 }): Promise<BrightComp[]> {
-  const { zip, propertyType, beds, sqft, maxResults = 15, monthsBack = 12 } = options;
+  const { zip, propertyType, maxResults = 15, monthsBack = 12, minComps = 3 } = options;
 
+  // Pull broad: 12 months, ZIP-wide, up to 200 results
   const cutoffDate = new Date();
   cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
   const cutoffStr = cutoffDate.toISOString().split("T")[0];
@@ -280,7 +290,6 @@ export async function fetchComps(options: {
     `CloseDate ge ${cutoffStr}`,
   ];
 
-  // Match property type if available
   if (propertyType) {
     const brightType = mapToBrightPropertyType(propertyType);
     if (brightType) {
@@ -295,12 +304,13 @@ export async function fetchComps(options: {
       $filter: filterParts.join(" and "),
       $select: selectFields,
       $orderby: "CloseDate desc",
-      $top: String(maxResults),
+      $top: "200",
     });
 
-    const records: BrightProperty[] = data.value || [];
+    const records: any[] = data.value || [];
 
-    return records.map((r: any) => {
+    // Map all results with distance calculation
+    const allComps: BrightComp[] = records.map((r: any) => {
       const price = r.ClosePrice || 0;
       const compSqft = r.LivingArea || 0;
       const suffix = r.StreetSuffix ? ` ${r.StreetSuffix}` : '';
@@ -328,6 +338,51 @@ export async function fetchComps(options: {
           : null,
       };
     });
+
+    console.log(`[BrightMLS] Fetched ${allComps.length} total closed sales in ${zip}`);
+
+    // Tiered radius + time filtering
+    const hasCoords = !!(options.latitude && options.longitude);
+    const now = Date.now();
+    const DAY_MS = 86400000;
+
+    const tiers = hasCoords
+      ? [
+          { label: "0.5mi / 180 days", radiusMiles: 0.5, days: 180 },
+          { label: "1mi / 240 days",   radiusMiles: 1.0, days: 240 },
+          { label: "ZIP-wide / 360 days", radiusMiles: Infinity, days: 360 },
+        ]
+      : [
+          { label: "180 days", radiusMiles: Infinity, days: 180 },
+          { label: "240 days", radiusMiles: Infinity, days: 240 },
+          { label: "360 days", radiusMiles: Infinity, days: 360 },
+        ];
+
+    for (const tier of tiers) {
+      const cutoff = now - tier.days * DAY_MS;
+      const tierComps = allComps.filter(c => {
+        if (c.price <= 0) return false;
+        const soldTime = new Date(c.soldDate).getTime();
+        if (soldTime < cutoff) return false;
+        if (tier.radiusMiles < Infinity && c.distanceMiles > tier.radiusMiles) return false;
+        return true;
+      });
+
+      console.log(`[BrightMLS] Tier "${tier.label}": ${tierComps.length} comps`);
+
+      if (tierComps.length >= minComps) {
+        // Sort by distance (closest first), then by date (newest first)
+        tierComps.sort((a, b) => {
+          if (a.distanceMiles !== b.distanceMiles) return a.distanceMiles - b.distanceMiles;
+          return new Date(b.soldDate).getTime() - new Date(a.soldDate).getTime();
+        });
+        return tierComps.slice(0, maxResults);
+      }
+    }
+
+    // If no tier hit minComps, return everything we have
+    console.log(`[BrightMLS] No tier met minComps=${minComps}, returning all ${allComps.length}`);
+    return allComps.filter(c => c.price > 0).slice(0, maxResults);
   } catch (error) {
     console.error("Bright MLS comps fetch failed:", error);
     return [];
