@@ -133,10 +133,37 @@ export async function setupAuth(app: Express) {
   });
 }
 
-export const isAuthenticated: RequestHandler = (req, res, next) => {
+const AGENT_SERVICE_ACCOUNT = {
+  id: "agent-service-account",
+  email: "appointments@theimpacthometeam.com",
+  firstName: "IHT",
+  lastName: "Agent",
+};
+
+let agentUserEnsured = false;
+
+async function ensureAgentUser() {
+  if (agentUserEnsured) return;
+  try {
+    const { authStorage } = await import("./storage");
+    await authStorage.upsertUser({
+      id: AGENT_SERVICE_ACCOUNT.id,
+      email: AGENT_SERVICE_ACCOUNT.email,
+      firstName: AGENT_SERVICE_ACCOUNT.firstName,
+      lastName: AGENT_SERVICE_ACCOUNT.lastName,
+    });
+    agentUserEnsured = true;
+  } catch (err) {
+    console.error("Failed to ensure agent service account:", err);
+  }
+}
+
+export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // API key auth for agent/programmatic access
   const apiKey = req.headers["x-api-key"] as string;
   if (apiKey && process.env.OFFERIQ_API_KEY && apiKey === process.env.OFFERIQ_API_KEY) {
+    await ensureAgentUser();
+    (req as any).user = { id: AGENT_SERVICE_ACCOUNT.id, claims: { sub: AGENT_SERVICE_ACCOUNT.id } };
     return next();
   }
 
