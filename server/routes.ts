@@ -448,75 +448,31 @@ Generate a JSON response with this structure:
       }
 
       const { address, propertyType } = parseResult.data;
-      const apiKey = process.env.RENTCAST_API_KEY;
-
-      if (!apiKey) {
-        return res.status(503).json({ 
-          error: "Comparable sales API not configured. Please add a RentCast API key.",
-          needsApiKey: true
-        });
-      }
-
-      const encodedAddress = encodeURIComponent(address);
-      // Use AVM endpoint which includes comparables in response
-      const compsUrl = `https://api.rentcast.io/v1/avm/value?address=${encodedAddress}&compCount=15`;
 
       // Parse ZIP from address for Bright MLS query
       const zipMatch = address.match(/\b(\d{5})\b/);
       const zip = zipMatch?.[1];
 
-      // Fetch RentCast comps and Bright MLS comps in parallel
-      const [response, brightComps] = await Promise.all([
-        fetch(compsUrl, {
-          headers: { "X-Api-Key": apiKey, "Accept": "application/json" },
-        }),
-        (brightMLS.isBrightMLSConfigured() && zip)
-          ? brightMLS.fetchComps({
-              zip,
-              propertyType,
-              beds: req.body.beds,
-              sqft: req.body.sqft,
-              latitude: req.body.latitude,
-              longitude: req.body.longitude,
-            }).catch((err) => {
-              console.error("Bright MLS comps failed (non-fatal):", err);
-              return [] as brightMLS.BrightComp[];
-            })
-          : Promise.resolve([] as brightMLS.BrightComp[]),
-      ]);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("RentCast API error:", response.status, errorText);
-
-        if (response.status === 401) {
-          return res.status(401).json({ error: "Invalid API key" });
-        }
-        if (response.status === 404) {
-          return res.status(404).json({ error: "No comparable sales found for this address" });
-        }
-        return res.status(response.status).json({ error: "Failed to fetch comparable sales" });
+      if (!brightMLS.isBrightMLSConfigured()) {
+        return res.status(503).json({
+          error: "BrightMLS not configured. Please add BRIGHT_MLS_CLIENT_ID and BRIGHT_MLS_CLIENT_SECRET.",
+          needsApiKey: true
+        });
       }
 
-      const data = await response.json();
+      if (!zip) {
+        return res.status(400).json({ error: "Could not parse ZIP code from address. Include ZIP in the address." });
+      }
 
-      // Map RentCast comps
-      const rentCastComps: ComparableSale[] = (data.comparables || []).map((comp: any) => ({
-        address: comp.formattedAddress || comp.address || "Unknown",
-        price: comp.price || comp.lastSalePrice || 0,
-        sqft: comp.squareFootage || 0,
-        pricePerSqft: comp.squareFootage ? Math.round((comp.price || comp.lastSalePrice || 0) / comp.squareFootage) : 0,
-        bedrooms: comp.bedrooms || 0,
-        bathrooms: comp.bathrooms || 0,
-        yearBuilt: comp.yearBuilt || 0,
-        soldDate: comp.lastSaleDate || comp.saleDate || "Unknown",
-        distanceMiles: comp.distance || 0,
-        daysOnMarket: comp.daysOnMarket,
-        propertyType: comp.propertyType,
-        latitude: comp.latitude || undefined,
-        longitude: comp.longitude || undefined,
-        correlation: comp.correlation || undefined,
-      }));
+      // Fetch BrightMLS comps
+      const brightComps = await brightMLS.fetchComps({
+        zip,
+        propertyType,
+        beds: req.body.beds,
+        sqft: req.body.sqft,
+        latitude: req.body.latitude,
+        longitude: req.body.longitude,
+      });
 
       // Map Bright MLS comps into the same shape
       const brightCompsNormalized: ComparableSale[] = brightComps.map((bc) => ({
@@ -535,21 +491,11 @@ Generate a JSON response with this structure:
         longitude: bc.longitude || undefined,
       }));
 
-      // Merge and deduplicate comps (prefer Bright MLS data when addresses overlap)
+      // Deduplicate BrightMLS comps by address
       const seenAddresses = new Set<string>();
       const mergedComps: ComparableSale[] = [];
 
-      // Bright MLS comps first (higher quality MLS data)
       for (const comp of brightCompsNormalized) {
-        const key = normalizeCompAddress(comp.address);
-        if (!seenAddresses.has(key) && comp.price > 0 && comp.sqft > 0) {
-          seenAddresses.add(key);
-          mergedComps.push(comp);
-        }
-      }
-
-      // Then RentCast comps (fill remaining slots)
-      for (const comp of rentCastComps) {
         const key = normalizeCompAddress(comp.address);
         if (!seenAddresses.has(key) && comp.price > 0 && comp.sqft > 0) {
           seenAddresses.add(key);
@@ -598,25 +544,11 @@ Generate a JSON response with this structure:
         ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
         : medianPrice;
 
-      // Use AVM's suggestedARV (the price field) if available, otherwise calculate from comps
-      const avmSuggestedARV = data.price || suggestedARV;
-
       const compsData: CompsData = {
         comps: validComps,
-        subjectProperty: data.subjectProperty ? {
-          address: data.subjectProperty.formattedAddress || address,
-          estimatedValue: data.price,
-          sqft: data.subjectProperty.squareFootage,
-          bedrooms: data.subjectProperty.bedrooms,
-          bathrooms: data.subjectProperty.bathrooms,
-          yearBuilt: data.subjectProperty.yearBuilt,
-          lotSize: data.subjectProperty.lotSize,
-          latitude: data.subjectProperty.latitude || data.latitude,
-          longitude: data.subjectProperty.longitude || data.longitude,
-        } : undefined,
         avgPricePerSqft,
         medianPrice,
-        suggestedARV: avmSuggestedARV,
+        suggestedARV,
       };
 
       res.json(compsData);
