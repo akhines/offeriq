@@ -2,14 +2,7 @@
   "buildCommand": "npx vite build",
   "outputDirectory": "dist/public",
   "framework": "vite",
-  "functions": {
-    "api/index.ts": {
-      "runtime": "@vercel/node@3",
-      "maxDuration": 60
-    }
-  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.ts" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
