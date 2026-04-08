@@ -209,7 +209,7 @@ export function ShareOfferDialog({
 
   const handleCreate = async () => {
     if (!isAuthenticated) {
-      window.location.href = "/api/login";
+      window.location.href = "/login";
       return;
     }
 

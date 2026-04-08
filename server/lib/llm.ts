@@ -1,9 +1,16 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+let openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI | null {
+  if (openai) return openai;
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  if (apiKey && baseURL) {
+    openai = new OpenAI({ apiKey, baseURL });
+  }
+  return openai;
+}
 
 const ETHICAL_GUARDRAIL = `You are an ethical real estate negotiation advisor. 
 IMPORTANT GUIDELINES:
@@ -24,7 +31,7 @@ export async function callLLM(prompt: string): Promise<string> {
   }
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI()!.chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: ETHICAL_GUARDRAIL },
@@ -49,7 +56,7 @@ export async function callLLMWithJSON<T>(prompt: string, fallback: T): Promise<T
   }
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI()!.chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: ETHICAL_GUARDRAIL + "\n\nYou must respond with valid JSON only. No markdown formatting." },

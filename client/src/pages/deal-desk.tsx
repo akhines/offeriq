@@ -387,7 +387,7 @@ export default function OfferIQ() {
 
   const handleSaveDeal = () => {
     if (!isAuthenticated) {
-      window.location.href = "/api/login";
+      window.location.href = "/login";
       return;
     }
     saveDealMutation.mutate();
@@ -637,7 +637,7 @@ export default function OfferIQ() {
                 variant="outline"
                 className="min-h-[44px] sm:min-h-8"
                 size="sm"
-                onClick={() => { window.location.href = "/api/login"; }}
+                onClick={() => { window.location.href = "/login"; }}
                 data-testid="button-sign-in"
               >
                 <LogIn className="h-4 w-4" />

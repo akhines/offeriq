@@ -118,7 +118,7 @@ export default function AccountPage() {
   });
 
   if (!isAuthenticated) {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
     return null;
   }
 

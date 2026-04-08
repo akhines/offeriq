@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -9,6 +10,25 @@ import rateLimit from "express-rate-limit";
 
 const app = express();
 const httpServer = createServer(app);
+
+// CORS for split deployment (Vercel client -> Fly.io server)
+const allowedOrigins = [
+  'https://offeriq-alpha.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+}));
 
 declare module "http" {
   interface IncomingMessage {
@@ -31,11 +51,18 @@ async function initStripe() {
     const stripeSync = await getStripeSync();
 
     console.log('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const { webhook } = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`
-    );
-    console.log(`Webhook configured: ${webhook.url}`);
+    const webhookHost = process.env.REPLIT_DOMAINS?.split(',')[0]
+      || process.env.FLY_APP_NAME && `${process.env.FLY_APP_NAME}.fly.dev`
+      || process.env.SERVER_URL?.replace(/^https?:\/\//, '');
+    if (!webhookHost) {
+      console.warn('No webhook host available (set REPLIT_DOMAINS, FLY_APP_NAME, or SERVER_URL) — skipping webhook setup');
+    } else {
+      const webhookBaseUrl = `https://${webhookHost}`;
+      const { webhook } = await stripeSync.findOrCreateManagedWebhook(
+        `${webhookBaseUrl}/api/stripe/webhook`
+      );
+      console.log(`Webhook configured: ${webhook.url}`);
+    }
 
     console.log('Syncing Stripe data...');
     stripeSync.syncBackfill()

@@ -1,6 +1,10 @@
 import Stripe from 'stripe';
 
-async function getCredentials() {
+function isReplit(): boolean {
+  return !!(process.env.REPLIT_CONNECTORS_HOSTNAME && (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
+}
+
+async function getReplitCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
@@ -38,6 +42,26 @@ async function getCredentials() {
   return {
     publishableKey: connectionSettings.settings.publishable,
     secretKey: connectionSettings.settings.secret,
+  };
+}
+
+async function getCredentials() {
+  // Use Replit connector when running on Replit
+  if (isReplit()) {
+    return getReplitCredentials();
+  }
+
+  // Fall back to direct env vars (Fly.io, local dev, etc.)
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY env var is required when not running on Replit');
+  }
+
+  return {
+    publishableKey: publishableKey || '',
+    secretKey,
   };
 }
 

@@ -13,12 +13,14 @@ import PricingPage from "@/pages/pricing";
 import AccountPage from "@/pages/account";
 import CheckoutSuccess from "@/pages/checkout-success";
 import SharedOfferPage from "@/pages/shared-offer";
+import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/login" component={AuthPage} />
       <Route path="/app" component={OfferIQ} />
       <Route path="/deals" component={SavedDeals} />
       <Route path="/deals/compare" component={CompareDeals} />

@@ -56,7 +56,7 @@ export default function PricingPage() {
 
   const handleSelect = (priceId: string) => {
     if (!isAuthenticated) {
-      window.location.href = "/api/login";
+      window.location.href = "/login";
       return;
     }
     checkoutMutation.mutate(priceId);

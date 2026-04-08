@@ -111,7 +111,7 @@ export default function LandingPage() {
     if (isAuthenticated) {
       navigate("/app");
     } else {
-      window.location.href = "/api/login";
+      navigate("/login");
     }
   };
 
@@ -192,10 +192,10 @@ export default function LandingPage() {
                 </Button>
               ) : (
                 <>
-                  <Button variant="ghost" onClick={() => window.location.href = "/api/login"} data-testid="button-login">
+                  <Button variant="ghost" onClick={() => navigate("/login")} data-testid="button-login">
                     Log In
                   </Button>
-                  <Button onClick={() => window.location.href = "/api/login"} data-testid="button-signup">
+                  <Button onClick={() => navigate("/login")} data-testid="button-signup">
                     Get Started
                   </Button>
                 </>
@@ -263,10 +263,10 @@ export default function LandingPage() {
                 </Button>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <Button variant="ghost" className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); window.location.href = "/api/login"; }} data-testid="button-login-mobile">
+                  <Button variant="ghost" className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); navigate("/login"); }} data-testid="button-login-mobile">
                     Log In
                   </Button>
-                  <Button className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); window.location.href = "/api/login"; }} data-testid="button-signup-mobile">
+                  <Button className="w-full min-h-[44px]" onClick={() => { setMobileMenuOpen(false); navigate("/login"); }} data-testid="button-signup-mobile">
                     Get Started
                   </Button>
                 </div>

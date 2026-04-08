@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+*.md
+.replit
+replit.nix
+.cache
+.config
+fly.toml
+Dockerfile
+.dockerignore
