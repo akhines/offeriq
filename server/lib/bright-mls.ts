@@ -45,10 +45,11 @@ async function getAccessToken(): Promise<string> {
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
+      "accept": "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+      "User-Agent": "Bright WebAPI/1.0",
     },
-    body: "grant_type=client_credentials&scope=clientcred",
+    body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`,
   });
 
   if (!response.ok) {
