@@ -270,10 +270,10 @@ export async function fetchComps(options: {
   cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
   const cutoffStr = cutoffDate.toISOString().split("T")[0];
 
+  // Try Active+Pending+Closed to see what data is accessible
   const filterParts: string[] = [
-    `StandardStatus eq 'Closed'`,
+    `(StandardStatus eq 'Closed' or StandardStatus eq 'Active' or StandardStatus eq 'Pending')`,
     `PostalCode eq '${escapeOData(zip)}'`,
-    `CloseDate ge ${cutoffStr}`,
   ];
 
   // Match property type if available
