@@ -73,7 +73,8 @@ async function queryBright(resource: string, params: Record<string, string>): Pr
   const token = await getAccessToken();
   const { baseUrl } = getConfig();
 
-  // Build URL manually — URLSearchParams double-encodes OData $filter syntax
+  // OData keys ($filter, $select, $top, $orderby) must stay literal — don't encode them.
+  // Values get encoded except for OData filter expressions which use spaces, quotes, etc.
   const queryParts = Object.entries(params).map(
     ([k, v]) => `${k}=${encodeURIComponent(v)}`
   );
@@ -89,13 +90,15 @@ async function queryBright(resource: string, params: Record<string, string>): Pr
     },
   });
 
+  const responseText = await response.text();
+  console.log(`[BrightMLS] Response status: ${response.status}, body length: ${responseText.length}, first 200: ${responseText.substring(0, 200)}`);
+
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Bright MLS query error [${resource}]:`, response.status, errorText);
+    console.error(`Bright MLS query error [${resource}]:`, response.status, responseText);
     throw new Error(`Bright MLS query failed: ${response.status}`);
   }
 
-  return response.json();
+  return JSON.parse(responseText);
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
