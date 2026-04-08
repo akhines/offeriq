@@ -79,6 +79,8 @@ async function queryBright(resource: string, params: Record<string, string>): Pr
   );
   const url = `${baseUrl}/${resource}?${queryParts.join("&")}`;
 
+  console.log(`[BrightMLS] Query URL: ${url}`);
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
