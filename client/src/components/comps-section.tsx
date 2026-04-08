@@ -60,6 +60,9 @@ interface CompsSectionProps {
   isLoading: boolean;
   subjectSqft?: number;
   onUseSuggestedARV?: (arv: number) => void;
+  onRefreshComps?: () => void;
+  selectedCompIndices?: Set<number>;
+  onCompSelectionChange?: (indices: Set<number>) => void;
 }
 
 type SortField = "price" | "pricePerSqft" | "sqft" | "distanceMiles" | "soldDate" | "correlation";
@@ -112,6 +115,9 @@ export function CompsSection({
   isLoading,
   subjectSqft,
   onUseSuggestedARV,
+  onRefreshComps,
+  selectedCompIndices,
+  onCompSelectionChange,
 }: CompsSectionProps) {
   const isCompact = useIsCompact();
   const [sortField, setSortField] = useState<SortField>("distanceMiles");
@@ -288,6 +294,18 @@ export function CompsSection({
               </Badge>
             </CardTitle>
             <div className="flex items-center gap-1">
+              {onRefreshComps && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRefreshComps}
+                  disabled={isLoading}
+                  data-testid="button-refresh-comps"
+                >
+                  <Navigation className="h-3 w-3 mr-1" />
+                  Pull Comps
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -425,6 +443,37 @@ export function CompsSection({
             <span>Sqft Range: {filteredStats.sqftRange.min.toLocaleString()} - {filteredStats.sqftRange.max.toLocaleString()}</span>
           </div>
 
+          {onCompSelectionChange && selectedCompIndices && (
+            (() => {
+              const selected = sortedComps.filter((_, i) => selectedCompIndices.has(i));
+              if (selected.length === 0) return <div className="text-xs text-amber-600 font-medium">No comps selected — check at least one to calculate ARV</div>;
+              const selPsf = selected.filter(c => c.pricePerSqft > 0).map(c => c.pricePerSqft).sort((a, b) => a - b);
+              const medianPsf = selPsf.length > 0 ? selPsf[Math.floor(selPsf.length / 2)] : 0;
+              const selPrices = selected.map(c => c.price).sort((a, b) => a - b);
+              const medianPrice = selPrices[Math.floor(selPrices.length / 2)] || 0;
+              const arvEst = subjectSqft && medianPsf > 0 ? medianPsf * subjectSqft : medianPrice;
+              return (
+                <div className="p-3 rounded-lg bg-accent/5 border border-accent/20 text-sm space-y-1">
+                  <div className="font-medium text-accent flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Selected Comps: {selected.length} of {sortedComps.length}
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <span>Median $/sqft: <strong>${medianPsf}</strong></span>
+                    <span>Median Price: <strong>{formatCurrency(medianPrice)}</strong></span>
+                    {subjectSqft && medianPsf > 0 && (
+                      <span>Estimated ARV: <strong>{formatCurrency(arvEst)}</strong>
+                        {onUseSuggestedARV && (
+                          <button className="ml-1 text-accent underline" onClick={() => onUseSuggestedARV(arvEst)}>Use this</button>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
           {viewMode === "map" && hasMapData ? (
             <CompsMap compsData={compsData} filteredComps={filteredComps} />
           ) : isCompact ? (
@@ -459,15 +508,31 @@ export function CompsSection({
                     </Button>
                   </div>
                   {displayedComps.map((comp, index) => {
+                    const globalIndex = sortedComps.indexOf(comp);
+                    const isSelected = selectedCompIndices?.has(globalIndex) ?? true;
                     const daysAgo = getDaysAgo(comp.soldDate);
                     return (
                       <div
                         key={index}
-                        className="p-3 rounded-md border bg-muted/30 space-y-2"
+                        className={`p-3 rounded-md border space-y-2 ${isSelected ? 'bg-muted/30' : 'bg-muted/10 opacity-50'}`}
                         data-testid={`card-comp-${index}`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 flex items-start gap-2">
+                            {onCompSelectionChange && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  const next = new Set(selectedCompIndices || new Set(sortedComps.map((_, i) => i)));
+                                  if (next.has(globalIndex)) next.delete(globalIndex);
+                                  else next.add(globalIndex);
+                                  onCompSelectionChange(next);
+                                }}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 flex-shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0 flex-1">
                             <div className="font-medium text-sm truncate" title={comp.address} data-testid={`text-comp-address-${index}`}>
                               <MapPin className="h-3 w-3 inline mr-1 flex-shrink-0" />
                               {comp.address}
@@ -481,6 +546,8 @@ export function CompsSection({
                                   {Math.round(comp.correlation * 100)}% match
                                 </Badge>
                               )}
+                            </div>
+                          </div>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
@@ -545,6 +612,7 @@ export function CompsSection({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {onCompSelectionChange && <TableHead className="w-[40px]">Use</TableHead>}
                       {streetViewAvailable && <TableHead className="w-[70px]">Photo</TableHead>}
                       <TableHead className="w-[180px]">Address</TableHead>
                       <TableHead className="text-right">
@@ -567,10 +635,27 @@ export function CompsSection({
                   </TableHeader>
                   <TableBody>
                     {displayedComps.map((comp, index) => {
+                      const globalIndex = sortedComps.indexOf(comp);
+                      const isSelected = selectedCompIndices?.has(globalIndex) ?? true;
                       const daysAgo = getDaysAgo(comp.soldDate);
                       const streetViewSrc = streetViewAvailable ? getStreetViewUrl(comp.address) : "";
                       return (
-                        <TableRow key={index} data-testid={`row-comp-${index}`}>
+                        <TableRow key={index} data-testid={`row-comp-${index}`} className={isSelected ? '' : 'opacity-40'}>
+                          {onCompSelectionChange && (
+                            <TableCell className="p-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  const next = new Set(selectedCompIndices || new Set(sortedComps.map((_, i) => i)));
+                                  if (next.has(globalIndex)) next.delete(globalIndex);
+                                  else next.add(globalIndex);
+                                  onCompSelectionChange(next);
+                                }}
+                                className="h-4 w-4 rounded border-gray-300"
+                              />
+                            </TableCell>
+                          )}
                           {streetViewAvailable && (
                             <TableCell className="p-1">
                               <div className="w-[60px] h-[40px] rounded overflow-hidden bg-muted flex items-center justify-center">

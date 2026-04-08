@@ -74,14 +74,20 @@ export function UnderwritingSection({
   const [redfinLink, setRedfinLink] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchComps = async (address: string, propertyType?: string) => {
+  const fetchComps = async (address: string, propertyType?: string, extra?: { beds?: number; sqft?: number; latitude?: number; longitude?: number }) => {
     setIsLoadingComps(true);
     setCompsData(null);
     try {
-      const response = await fetch("/api/comps", {
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/comps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, propertyType }),
+        body: JSON.stringify({
+          address,
+          propertyType,
+          structureType: "Detached",
+          ...extra,
+        }),
       });
 
       if (!response.ok) {
@@ -211,7 +217,12 @@ export function UnderwritingSection({
         setRedfinLink(data.redfinLink);
       }
 
-      fetchComps(property.address, mapPropertyType(data.propertyType));
+      fetchComps(property.address, mapPropertyType(data.propertyType), {
+        beds: data.beds || property.beds,
+        sqft: data.sqft || property.sqft,
+        latitude: data.latitude,
+        longitude: data.longitude,
+      });
 
       const sources = data.brightMLSDataAvailable ? "RentCast + Bright MLS" : "RentCast";
       toast({
