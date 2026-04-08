@@ -497,7 +497,7 @@ Generate a JSON response with this structure:
 
       for (const comp of brightCompsNormalized) {
         const key = normalizeCompAddress(comp.address);
-        if (!seenAddresses.has(key) && comp.price > 0 && comp.sqft > 0) {
+        if (!seenAddresses.has(key) && comp.price > 0) {
           seenAddresses.add(key);
           mergedComps.push(comp);
         }
